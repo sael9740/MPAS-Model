@@ -2661,7 +2661,8 @@ int generate_package_logic(ezxml_t registry)/*{{{*/
 	fortprintf(fd, "#define COMMA ,\n");
 	fortprintf(fd, "#define PACKAGE_LOGIC_PRINT(M) call mpas_log_write(M)\n");
 	fortprintf(fd, "#else\n");
-	fortprintf(fd, "#define PACKAGE_LOGIC_PRINT(M) ! M\n");
+	fortprintf(fd, "#define COMMA ,\n");
+	fortprintf(fd, "#define PACKAGE_LOGIC_PRINT(M) if (.false.) call mpas_log_write(M)\n");
 	fortprintf(fd, "#endif\n\n");
 
 	fortprintf(fd, "   !\n");
