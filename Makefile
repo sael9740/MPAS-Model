@@ -35,6 +35,7 @@ gnu:   # BUILDTARGET GNU Fortran, C, and C++ compilers
 	"USE_PAPI = $(USE_PAPI)" \
 	"OPENMP = $(OPENMP)" \
 	"OPENACC = $(OPENACC)" \
+	"OPENACC_GPU_RESIDENT = $(OPENACC_GPU_RESIDENT)" \
 	"CPPFLAGS = $(MODEL_FORMULATION) -D_MPI" )
 
 xlf:   # BUILDTARGET IBM XL compilers
@@ -117,6 +118,7 @@ ftn:   # BUILDTARGET Cray compilers
 	"USE_PAPI = $(USE_PAPI)" \
 	"OPENMP = $(OPENMP)" \
 	"OPENACC = $(OPENACC)" \
+	"OPENACC_GPU_RESIDENT = $(OPENACC_GPU_RESIDENT)" \
 	"CPPFLAGS = $(MODEL_FORMULATION) -D_MPI" )
 
 titan-cray:   # BUILDTARGET (deprecated) Cray compilers with options for ORNL Titan
@@ -147,17 +149,17 @@ nvhpc:   # BUILDTARGET NVIDIA HPC SDK
 	"CC_SERIAL = nvc" \
 	"CXX_SERIAL = nvc++" \
 	"FFLAGS_PROMOTION = -r8" \
-	"FFLAGS_OPT = -gopt -O4 -byteswapio -Mfree" \
-	"CFLAGS_OPT = -gopt -O3" \
-	"CXXFLAGS_OPT = -gopt -O3" \
-	"LDFLAGS_OPT = -gopt -O3" \
+	"FFLAGS_OPT = -g -gopt -O4 -byteswapio -Mfree" \
+	"CFLAGS_OPT = -g -gopt -O3" \
+	"CXXFLAGS_OPT = -g -gopt -O3" \
+	"LDFLAGS_OPT = -g -gopt -O3" \
 	"FFLAGS_DEBUG = -O0 -g -Mbounds -Mchkptr -byteswapio -Mfree -Ktrap=divz,fp,inv,ovf -traceback" \
 	"CFLAGS_DEBUG = -O0 -g -traceback" \
 	"CXXFLAGS_DEBUG = -O0 -g -traceback" \
 	"LDFLAGS_DEBUG = -O0 -g -Mbounds -Ktrap=divz,fp,inv,ovf -traceback" \
 	"FFLAGS_OMP = -mp" \
 	"CFLAGS_OMP = -mp" \
-	"FFLAGS_ACC = -Mnofma -acc -gpu=cc70,cc80 -Minfo=accel" \
+	"FFLAGS_ACC = -Mnofma -acc -gpu=cc90 -Minfo=accel" \
 	"CFLAGS_ACC =" \
 	"PICFLAG = -fpic" \
 	"BUILD_TARGET = $(@)" \
@@ -166,6 +168,7 @@ nvhpc:   # BUILDTARGET NVIDIA HPC SDK
 	"USE_PAPI = $(USE_PAPI)" \
 	"OPENMP = $(OPENMP)" \
 	"OPENACC = $(OPENACC)" \
+	"OPENACC_GPU_RESIDENT = $(OPENACC_GPU_RESIDENT)" \
 	"CPPFLAGS = $(MODEL_FORMULATION) -D_MPI -DCPRPGI" )
 
 pgi:   # BUILDTARGET PGI compiler suite
@@ -196,6 +199,7 @@ pgi:   # BUILDTARGET PGI compiler suite
 	"USE_PAPI = $(USE_PAPI)" \
 	"OPENMP = $(OPENMP)" \
 	"OPENACC = $(OPENACC)" \
+	"OPENACC_GPU_RESIDENT = $(OPENACC_GPU_RESIDENT)" \
 	"CPPFLAGS = $(MODEL_FORMULATION) -D_MPI -DCPRPGI" )
 
 pgi-summit:   # BUILDTARGET PGI compiler suite w/OpenACC options for ORNL Summit
@@ -226,6 +230,7 @@ pgi-summit:   # BUILDTARGET PGI compiler suite w/OpenACC options for ORNL Summit
 	"USE_PAPI = $(USE_PAPI)" \
 	"OPENMP = $(OPENMP)" \
 	"OPENACC = $(OPENACC)" \
+	"OPENACC_GPU_RESIDENT = $(OPENACC_GPU_RESIDENT)" \
 	"CPPFLAGS = -DpgiFortran -D_MPI -DUNDERSCORE" )
 
 pgi-nersc:   # BUILDTARGET (deprecated) PGI compilers on NERSC machines
@@ -406,6 +411,7 @@ gfortran:   # BUILDTARGET GNU Fortran, C, and C++ compilers
 	"USE_PAPI = $(USE_PAPI)" \
 	"OPENMP = $(OPENMP)" \
 	"OPENACC = $(OPENACC)" \
+	"OPENACC_GPU_RESIDENT = $(OPENACC_GPU_RESIDENT)" \
 	"CPPFLAGS = $(MODEL_FORMULATION) -D_MPI" )
 
 gfortran-clang:   # BUILDTARGET GNU Fortran compiler with LLVM clang/clang++ compilers
@@ -877,6 +883,13 @@ ifeq "$(OPENACC)" "true"
         LDFLAGS += $(FFLAGS_ACC)
 endif #OPENACC IF
 
+ifeq "$(OPENACC_GPU_RESIDENT)" "true"
+ifneq "$(OPENACC)" "true"
+$(error OPENACC_GPU_RESIDENT=true requires OPENACC=true)
+endif
+        override CPPFLAGS += "-DMPAS_OPENACC_GPU_RESIDENT"
+endif #OPENACC_GPU_RESIDENT IF
+
 ifeq "$(OPENMP_OFFLOAD)" "true"
 	FFLAGS += $(FFLAGS_GPU)
 	CFLAGS += $(FFLAGS_GPU)
@@ -999,6 +1012,12 @@ else
 	OPENACC_MESSAGE="MPAS was built without OpenACC accelerator support."
 endif
 
+ifeq "$(OPENACC_GPU_RESIDENT)" "true"
+	OPENACC_GPU_RESIDENT_MESSAGE="MPAS was built with the GPU-resident OpenACC data model enabled."
+else
+	OPENACC_GPU_RESIDENT_MESSAGE="MPAS was built without the GPU-resident OpenACC data model."
+endif
+
 
 ifneq ($(wildcard namelist.$(NAMELIST_SUFFIX)), ) # Check for generated namelist file.
 	NAMELIST_MESSAGE="A default namelist file (namelist.$(NAMELIST_SUFFIX).defaults) has been generated, but namelist.$(NAMELIST_SUFFIX) has not been modified."
@@ -1086,6 +1105,7 @@ rebuild_check:
 	OPENMP=$(OPENMP)\n$\
 	OPENMP_OFFLOAD=$(OPENMP_OFFLOAD)\n$\
 	OPENACC=$(OPENACC)\n$\
+	OPENACC_GPU_RESIDENT=$(OPENACC_GPU_RESIDENT)\n$\
 	TAU=$(TAU)\n$\
 	PICFLAG=$(PICFLAG)\n$\
 	TIMER_LIB=$(TIMER_LIB)\n$\
@@ -1572,6 +1592,7 @@ mpas_main: $(MAIN_DEPS)
 	@echo $(OPENMP_MESSAGE)
 	@echo $(OPENMP_OFFLOAD_MESSAGE)
 	@echo $(OPENACC_MESSAGE)
+	@echo $(OPENACC_GPU_RESIDENT_MESSAGE)
 	@echo $(MUSICA_MESSAGE)
 	@echo $(SCOTCH_MESSAGE)
 	@echo $(SHAREDLIB_MESSAGE)
@@ -1636,6 +1657,7 @@ errmsg:
 	@echo "                    TIMER_LIB=tau - Uses TAU for the timer interface instead of the native interface"
 	@echo "    OPENMP=true   - builds and links with OpenMP flags. Default is to not use OpenMP."
 	@echo "    OPENACC=true  - builds and links with OpenACC flags. Default is to not use OpenACC."
+	@echo "    OPENACC_GPU_RESIDENT=true - builds with the GPU-resident OpenACC data model. Requires OPENACC=true. Default is false."
 	@echo "    PRECISION=double - builds with default double-precision real kind. Default is to use single-precision."
 	@echo "    SHAREDLIB=true - generate position-independent code suitable for use in a shared library. Default is false."
 	@echo "    MPAS_ESMF=opt  - Selects the ESMF library to be used for MPAS. Options are:"
