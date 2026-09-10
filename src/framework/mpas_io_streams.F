@@ -2427,6 +2427,338 @@ module mpas_io_streams
    end subroutine MPAS_streamUpdateField_1dChar
 
 
+!***********************************************************************
+!
+!  io_streams_copy_field_* routines
+!
+!> \brief   Copy freshly-read data from a stream's host temp buffer into a
+!>          field's array, or (for MPAS_writeStream) the reverse.
+!> \details
+!>  Both "dst" and "src" are always passed as whole arrays -- never as
+!>  Fortran array sections -- so a section that happens to be non-contiguous
+!>  (or one a given compiler simply chooses not to pass by reference) can
+!>  never cause an implicit copy-in/copy-out temporary to be created at the
+!>  call boundary. That would silently disconnect the array seen inside the
+!>  routine from whatever device presence "dst"'s real allocation has, and
+!>  any "!$acc" work here would then operate on the wrong memory. Instead,
+!>  the caller passes plain integer start/count bounds, and all indexing
+!>  happens with explicit loops inside the "!$acc parallel loop" region.
+!>
+!>  Two variants per rank:
+!>   - io_streams_copy_field_*d_{int,real}      -- isVarArray == .false.:
+!>     copy a whole n-column block from src into dst.
+!>   - io_streams_copy_field_*d_{int,real}_j    -- isVarArray == .true.:
+!>     copy into/from a single constituent row "j" of dst, leaving dst's
+!>     other rows untouched.
+!>
+!>  "copy" (not "copyout") is used for dst in both variants: a given call
+!>  only ever touches part of dst (a range of columns, or a single
+!>  constituent row), so whatever's already there in the untouched part
+!>  needs to round-trip unchanged rather than being clobbered by an
+!>  unrelated device allocation's default/garbage content.
+!
+!-----------------------------------------------------------------------
+   subroutine io_streams_copy_field_1d_int(dst, dstStart, src, srcStart, n)!{{{
+      integer, dimension(:) :: dst
+      integer, intent(in) :: dstStart
+      integer, dimension(:), intent(in) :: src
+      integer, intent(in) :: srcStart
+      integer, intent(in) :: n
+
+      integer :: k
+
+      !$acc parallel loop copy(dst) copyin(src(srcStart:srcStart+n-1))
+      do k = 0, n-1
+         dst(dstStart+k) = src(srcStart+k)
+      end do
+      !$acc end parallel loop
+   end subroutine io_streams_copy_field_1d_int!}}}
+
+   subroutine io_streams_copy_field_2d_int(dst, dstStart, src, srcStart, n)!{{{
+      integer, dimension(:,:) :: dst
+      integer, intent(in) :: dstStart
+      integer, dimension(:,:), intent(in) :: src
+      integer, intent(in) :: srcStart
+      integer, intent(in) :: n
+
+      integer :: k1, k2, n1
+
+      n1 = size(dst,1)
+
+      !$acc parallel loop collapse(2) copy(dst) copyin(src(:,srcStart:srcStart+n-1))
+      do k2 = 0, n-1
+         do k1 = 1, n1
+            dst(k1, dstStart+k2) = src(k1, srcStart+k2)
+         end do
+      end do
+      !$acc end parallel loop
+   end subroutine io_streams_copy_field_2d_int!}}}
+
+   subroutine io_streams_copy_field_2d_int_j(dst, j, dstStart, src, srcStart, n)!{{{
+      integer, dimension(:,:) :: dst
+      integer, intent(in) :: j
+      integer, intent(in) :: dstStart
+      integer, dimension(:), intent(in) :: src
+      integer, intent(in) :: srcStart
+      integer, intent(in) :: n
+
+      integer :: k
+
+      !$acc parallel loop copy(dst) copyin(src(srcStart:srcStart+n-1))
+      do k = 0, n-1
+         dst(j, dstStart+k) = src(srcStart+k)
+      end do
+      !$acc end parallel loop
+   end subroutine io_streams_copy_field_2d_int_j!}}}
+
+   subroutine io_streams_copy_field_3d_int(dst, dstStart, src, srcStart, n)!{{{
+      integer, dimension(:,:,:) :: dst
+      integer, intent(in) :: dstStart
+      integer, dimension(:,:,:), intent(in) :: src
+      integer, intent(in) :: srcStart
+      integer, intent(in) :: n
+
+      integer :: k1, k2, k3, n1, n2
+
+      n1 = size(dst,1)
+      n2 = size(dst,2)
+
+      !$acc parallel loop collapse(3) copy(dst) copyin(src(:,:,srcStart:srcStart+n-1))
+      do k3 = 0, n-1
+         do k2 = 1, n2
+            do k1 = 1, n1
+               dst(k1, k2, dstStart+k3) = src(k1, k2, srcStart+k3)
+            end do
+         end do
+      end do
+      !$acc end parallel loop
+   end subroutine io_streams_copy_field_3d_int!}}}
+
+   subroutine io_streams_copy_field_3d_int_j(dst, j, dstStart, src, srcStart, n)!{{{
+      integer, dimension(:,:,:) :: dst
+      integer, intent(in) :: j
+      integer, intent(in) :: dstStart
+      integer, dimension(:,:), intent(in) :: src
+      integer, intent(in) :: srcStart
+      integer, intent(in) :: n
+
+      integer :: k1, k2, n1
+
+      n1 = size(dst,2)
+
+      !$acc parallel loop collapse(2) copy(dst) copyin(src(:,srcStart:srcStart+n-1))
+      do k2 = 0, n-1
+         do k1 = 1, n1
+            dst(j, k1, dstStart+k2) = src(k1, srcStart+k2)
+         end do
+      end do
+      !$acc end parallel loop
+   end subroutine io_streams_copy_field_3d_int_j!}}}
+
+   subroutine io_streams_copy_field_1d_real(dst, dstStart, src, srcStart, n)!{{{
+      real (kind=RKIND), dimension(:) :: dst
+      integer, intent(in) :: dstStart
+      real (kind=RKIND), dimension(:), intent(in) :: src
+      integer, intent(in) :: srcStart
+      integer, intent(in) :: n
+
+      integer :: k
+
+      !$acc parallel loop copy(dst) copyin(src(srcStart:srcStart+n-1))
+      do k = 0, n-1
+         dst(dstStart+k) = src(srcStart+k)
+      end do
+      !$acc end parallel loop
+   end subroutine io_streams_copy_field_1d_real!}}}
+
+   subroutine io_streams_copy_field_2d_real(dst, dstStart, src, srcStart, n)!{{{
+      real (kind=RKIND), dimension(:,:) :: dst
+      integer, intent(in) :: dstStart
+      real (kind=RKIND), dimension(:,:), intent(in) :: src
+      integer, intent(in) :: srcStart
+      integer, intent(in) :: n
+
+      integer :: k1, k2, n1
+
+      n1 = size(dst,1)
+
+      !$acc parallel loop collapse(2) copy(dst) copyin(src(:,srcStart:srcStart+n-1))
+      do k2 = 0, n-1
+         do k1 = 1, n1
+            dst(k1, dstStart+k2) = src(k1, srcStart+k2)
+         end do
+      end do
+      !$acc end parallel loop
+   end subroutine io_streams_copy_field_2d_real!}}}
+
+   subroutine io_streams_copy_field_2d_real_j(dst, j, dstStart, src, srcStart, n)!{{{
+      real (kind=RKIND), dimension(:,:) :: dst
+      integer, intent(in) :: j
+      integer, intent(in) :: dstStart
+      real (kind=RKIND), dimension(:), intent(in) :: src
+      integer, intent(in) :: srcStart
+      integer, intent(in) :: n
+
+      integer :: k
+
+      !$acc parallel loop copy(dst) copyin(src(srcStart:srcStart+n-1))
+      do k = 0, n-1
+         dst(j, dstStart+k) = src(srcStart+k)
+      end do
+      !$acc end parallel loop
+   end subroutine io_streams_copy_field_2d_real_j!}}}
+
+   subroutine io_streams_copy_field_3d_real(dst, dstStart, src, srcStart, n)!{{{
+      real (kind=RKIND), dimension(:,:,:) :: dst
+      integer, intent(in) :: dstStart
+      real (kind=RKIND), dimension(:,:,:), intent(in) :: src
+      integer, intent(in) :: srcStart
+      integer, intent(in) :: n
+
+      integer :: k1, k2, k3, n1, n2
+
+      n1 = size(dst,1)
+      n2 = size(dst,2)
+
+      !$acc parallel loop collapse(3) copy(dst) copyin(src(:,:,srcStart:srcStart+n-1))
+      do k3 = 0, n-1
+         do k2 = 1, n2
+            do k1 = 1, n1
+               dst(k1, k2, dstStart+k3) = src(k1, k2, srcStart+k3)
+            end do
+         end do
+      end do
+      !$acc end parallel loop
+   end subroutine io_streams_copy_field_3d_real!}}}
+
+   subroutine io_streams_copy_field_3d_real_j(dst, j, dstStart, src, srcStart, n)!{{{
+      real (kind=RKIND), dimension(:,:,:) :: dst
+      integer, intent(in) :: j
+      integer, intent(in) :: dstStart
+      real (kind=RKIND), dimension(:,:), intent(in) :: src
+      integer, intent(in) :: srcStart
+      integer, intent(in) :: n
+
+      integer :: k1, k2, n1
+
+      n1 = size(dst,2)
+
+      !$acc parallel loop collapse(2) copy(dst) copyin(src(:,srcStart:srcStart+n-1))
+      do k2 = 0, n-1
+         do k1 = 1, n1
+            dst(j, k1, dstStart+k2) = src(k1, srcStart+k2)
+         end do
+      end do
+      !$acc end parallel loop
+   end subroutine io_streams_copy_field_3d_real_j!}}}
+
+   subroutine io_streams_copy_field_4d_real(dst, dstStart, src, srcStart, n)!{{{
+      real (kind=RKIND), dimension(:,:,:,:) :: dst
+      integer, intent(in) :: dstStart
+      real (kind=RKIND), dimension(:,:,:,:), intent(in) :: src
+      integer, intent(in) :: srcStart
+      integer, intent(in) :: n
+
+      integer :: k1, k2, k3, k4, n1, n2, n3
+
+      n1 = size(dst,1)
+      n2 = size(dst,2)
+      n3 = size(dst,3)
+
+      !$acc parallel loop collapse(4) copy(dst) copyin(src(:,:,:,srcStart:srcStart+n-1))
+      do k4 = 0, n-1
+         do k3 = 1, n3
+            do k2 = 1, n2
+               do k1 = 1, n1
+                  dst(k1, k2, k3, dstStart+k4) = src(k1, k2, k3, srcStart+k4)
+               end do
+            end do
+         end do
+      end do
+      !$acc end parallel loop
+   end subroutine io_streams_copy_field_4d_real!}}}
+
+   subroutine io_streams_copy_field_4d_real_j(dst, j, dstStart, src, srcStart, n)!{{{
+      real (kind=RKIND), dimension(:,:,:,:) :: dst
+      integer, intent(in) :: j
+      integer, intent(in) :: dstStart
+      real (kind=RKIND), dimension(:,:,:), intent(in) :: src
+      integer, intent(in) :: srcStart
+      integer, intent(in) :: n
+
+      integer :: k1, k2, k3, n1, n2
+
+      n1 = size(dst,2)
+      n2 = size(dst,3)
+
+      !$acc parallel loop collapse(3) copy(dst) copyin(src(:,:,srcStart:srcStart+n-1))
+      do k3 = 0, n-1
+         do k2 = 1, n2
+            do k1 = 1, n1
+               dst(j, k1, k2, dstStart+k3) = src(k1, k2, srcStart+k3)
+            end do
+         end do
+      end do
+      !$acc end parallel loop
+   end subroutine io_streams_copy_field_4d_real_j!}}}
+
+   subroutine io_streams_copy_field_5d_real(dst, dstStart, src, srcStart, n)!{{{
+      real (kind=RKIND), dimension(:,:,:,:,:) :: dst
+      integer, intent(in) :: dstStart
+      real (kind=RKIND), dimension(:,:,:,:,:), intent(in) :: src
+      integer, intent(in) :: srcStart
+      integer, intent(in) :: n
+
+      integer :: k1, k2, k3, k4, k5, n1, n2, n3, n4
+
+      n1 = size(dst,1)
+      n2 = size(dst,2)
+      n3 = size(dst,3)
+      n4 = size(dst,4)
+
+      !$acc parallel loop collapse(5) copy(dst) copyin(src(:,:,:,:,srcStart:srcStart+n-1))
+      do k5 = 0, n-1
+         do k4 = 1, n4
+            do k3 = 1, n3
+               do k2 = 1, n2
+                  do k1 = 1, n1
+                     dst(k1, k2, k3, k4, dstStart+k5) = src(k1, k2, k3, k4, srcStart+k5)
+                  end do
+               end do
+            end do
+         end do
+      end do
+      !$acc end parallel loop
+   end subroutine io_streams_copy_field_5d_real!}}}
+
+   subroutine io_streams_copy_field_5d_real_j(dst, j, dstStart, src, srcStart, n)!{{{
+      real (kind=RKIND), dimension(:,:,:,:,:) :: dst
+      integer, intent(in) :: j
+      integer, intent(in) :: dstStart
+      real (kind=RKIND), dimension(:,:,:,:), intent(in) :: src
+      integer, intent(in) :: srcStart
+      integer, intent(in) :: n
+
+      integer :: k1, k2, k3, k4, n1, n2, n3
+
+      n1 = size(dst,2)
+      n2 = size(dst,3)
+      n3 = size(dst,4)
+
+      !$acc parallel loop collapse(4) copy(dst) copyin(src(:,:,:,srcStart:srcStart+n-1))
+      do k4 = 0, n-1
+         do k3 = 1, n3
+            do k2 = 1, n2
+               do k1 = 1, n1
+                  dst(j, k1, k2, k3, dstStart+k4) = src(k1, k2, k3, srcStart+k4)
+               end do
+            end do
+         end do
+      end do
+      !$acc end parallel loop
+   end subroutine io_streams_copy_field_5d_real_j!}}}
+
+
    subroutine MPAS_readStream(stream, frame, ierr)
 
       implicit none
@@ -2559,14 +2891,14 @@ module mpas_io_streams
                      if (field_cursor % int1dField % isVarArray) then
                         field_1dint_ptr % array(j) = int0d_temp
                      else
-                        field_1dint_ptr % array(1:ownedSize) = int1d_temp(i:i+ownedSize-1)
+                        call io_streams_copy_field_1d_int(field_1dint_ptr % array, 1, int1d_temp, i, ownedSize)
                      end if
                      i = i + ownedSize
                      field_1dint_ptr => field_1dint_ptr % next
                   end do
 
                else
-   
+
                   if (field_cursor % int1dField % isVarArray) then
                      call mpas_dmpar_bcast_int( mpas_io_handle_dminfo(stream % fileHandle), int0d_temp)
                      field_1dint_ptr => field_cursor % int1dField
@@ -2578,7 +2910,7 @@ module mpas_io_streams
                      call mpas_dmpar_bcast_ints( mpas_io_handle_dminfo(stream % fileHandle), size(int1d_temp), int1d_temp(:))
                      field_1dint_ptr => field_cursor % int1dField
                      do while (associated(field_1dint_ptr))
-                        field_1dint_ptr % array(:) = int1d_temp(:)
+                        call io_streams_copy_field_1d_int(field_1dint_ptr % array, 1, int1d_temp, 1, size(int1d_temp))
                         field_1dint_ptr => field_1dint_ptr % next
                      end do
                   end if
@@ -2635,28 +2967,28 @@ module mpas_io_streams
                      end if
 
                      if (field_cursor % int2dField % isVarArray) then
-                        field_2dint_ptr % array(j,1:ownedSize) = int1d_temp(i:i+ownedSize-1)
+                        call io_streams_copy_field_2d_int_j(field_2dint_ptr % array, j, 1, int1d_temp, i, ownedSize)
                      else
-                        field_2dint_ptr % array(:,1:ownedSize) = int2d_temp(:,i:i+ownedSize-1)
+                        call io_streams_copy_field_2d_int(field_2dint_ptr % array, 1, int2d_temp, i, ownedSize)
                      end if
                      i = i + ownedSize
                      field_2dint_ptr => field_2dint_ptr % next
                   end do
 
                else
-   
+
                   if (field_cursor % int2dField % isVarArray) then
                      call mpas_dmpar_bcast_ints( mpas_io_handle_dminfo(stream % fileHandle), size(int1d_temp), int1d_temp(:))
                      field_2dint_ptr => field_cursor % int2dField
                      do while (associated(field_2dint_ptr))
-                        field_2dint_ptr % array(j,:) = int1d_temp(:)
+                        call io_streams_copy_field_2d_int_j(field_2dint_ptr % array, j, 1, int1d_temp, 1, size(int1d_temp))
                         field_2dint_ptr => field_2dint_ptr % next
                      end do
                   else
                      call mpas_dmpar_bcast_ints( mpas_io_handle_dminfo(stream % fileHandle), size(int2d_temp), int2d_temp(:,1))
                      field_2dint_ptr => field_cursor % int2dField
                      do while (associated(field_2dint_ptr))
-                        field_2dint_ptr % array(:,:) = int2d_temp(:,:)
+                        call io_streams_copy_field_2d_int(field_2dint_ptr % array, 1, int2d_temp, 1, size(int2d_temp,2))
                         field_2dint_ptr => field_2dint_ptr % next
                      end do
                   end if
@@ -2717,28 +3049,28 @@ module mpas_io_streams
                      end if
 
                      if (field_cursor % int3dField % isVarArray) then
-                        field_3dint_ptr % array(j,:,1:ownedSize) = int2d_temp(:,i:i+ownedSize-1)
+                        call io_streams_copy_field_3d_int_j(field_3dint_ptr % array, j, 1, int2d_temp, i, ownedSize)
                      else
-                        field_3dint_ptr % array(:,:,1:ownedSize) = int3d_temp(:,:,i:i+ownedSize-1)
+                        call io_streams_copy_field_3d_int(field_3dint_ptr % array, 1, int3d_temp, i, ownedSize)
                      end if
                      i = i + ownedSize
                      field_3dint_ptr => field_3dint_ptr % next
                   end do
 
                else
-   
+
                   if (field_cursor % int3dField % isVarArray) then
                      call mpas_dmpar_bcast_ints( mpas_io_handle_dminfo(stream % fileHandle), size(int2d_temp), int2d_temp(:,1))
                      field_3dint_ptr => field_cursor % int3dField
                      do while (associated(field_3dint_ptr))
-                        field_3dint_ptr % array(j,:,:) = int2d_temp(:,:)
+                        call io_streams_copy_field_3d_int_j(field_3dint_ptr % array, j, 1, int2d_temp, 1, size(int2d_temp,2))
                         field_3dint_ptr => field_3dint_ptr % next
                      end do
                   else
                      call mpas_dmpar_bcast_ints( mpas_io_handle_dminfo(stream % fileHandle), size(int3d_temp), int3d_temp(:,1,1))
                      field_3dint_ptr => field_cursor % int3dField
                      do while (associated(field_3dint_ptr))
-                        field_3dint_ptr % array(:,:,:) = int3d_temp(:,:,:)
+                        call io_streams_copy_field_3d_int(field_3dint_ptr % array, 1, int3d_temp, 1, size(int3d_temp,3))
                         field_3dint_ptr => field_3dint_ptr % next
                      end do
                   end if
@@ -2820,14 +3152,14 @@ module mpas_io_streams
                      if (field_cursor % real1dField % isVarArray) then
                         field_1dreal_ptr % array(j) = real0d_temp
                      else
-                        field_1dreal_ptr % array(1:ownedSize) = real1d_temp(i:i+ownedSize-1)
+                        call io_streams_copy_field_1d_real(field_1dreal_ptr % array, 1, real1d_temp, i, ownedSize)
                      end if
                      i = i + ownedSize
                      field_1dreal_ptr => field_1dreal_ptr % next
                   end do
 
                else
-   
+
                   if (field_cursor % real1dField % isVarArray) then
                      call mpas_dmpar_bcast_real( mpas_io_handle_dminfo(stream % fileHandle), real0d_temp)
                      field_1dreal_ptr => field_cursor % real1dField
@@ -2839,7 +3171,7 @@ module mpas_io_streams
                      call mpas_dmpar_bcast_reals( mpas_io_handle_dminfo(stream % fileHandle), size(real1d_temp), real1d_temp(:))
                      field_1dreal_ptr => field_cursor % real1dField
                      do while (associated(field_1dreal_ptr))
-                        field_1dreal_ptr % array(:) = real1d_temp(:)
+                        call io_streams_copy_field_1d_real(field_1dreal_ptr % array, 1, real1d_temp, 1, size(real1d_temp))
                         field_1dreal_ptr => field_1dreal_ptr % next
                      end do
                   end if
@@ -2896,28 +3228,28 @@ module mpas_io_streams
                      end if
 
                      if (field_cursor % real2dField % isVarArray) then
-                        field_2dreal_ptr % array(j,1:ownedSize) = real1d_temp(i:i+ownedSize-1)
+                        call io_streams_copy_field_2d_real_j(field_2dreal_ptr % array, j, 1, real1d_temp, i, ownedSize)
                      else
-                        field_2dreal_ptr % array(:,1:ownedSize) = real2d_temp(:,i:i+ownedSize-1)
+                        call io_streams_copy_field_2d_real(field_2dreal_ptr % array, 1, real2d_temp, i, ownedSize)
                      end if
                      i = i + ownedSize
                      field_2dreal_ptr => field_2dreal_ptr % next
                   end do
 
                else
-   
+
                   if (field_cursor % real2dField % isVarArray) then
                      call mpas_dmpar_bcast_reals( mpas_io_handle_dminfo(stream % fileHandle), size(real1d_temp), real1d_temp(:))
                      field_2dreal_ptr => field_cursor % real2dField
                      do while (associated(field_2dreal_ptr))
-                        field_2dreal_ptr % array(j,:) = real1d_temp(:)
+                        call io_streams_copy_field_2d_real_j(field_2dreal_ptr % array, j, 1, real1d_temp, 1, size(real1d_temp))
                         field_2dreal_ptr => field_2dreal_ptr % next
                      end do
                   else
                      call mpas_dmpar_bcast_reals( mpas_io_handle_dminfo(stream % fileHandle), size(real2d_temp), real2d_temp(:,1))
                      field_2dreal_ptr => field_cursor % real2dField
                      do while (associated(field_2dreal_ptr))
-                        field_2dreal_ptr % array(:,:) = real2d_temp(:,:)
+                        call io_streams_copy_field_2d_real(field_2dreal_ptr % array, 1, real2d_temp, 1, size(real2d_temp,2))
                         field_2dreal_ptr => field_2dreal_ptr % next
                      end do
                   end if
@@ -2981,29 +3313,28 @@ module mpas_io_streams
                      end if
 
                      if (field_cursor % real3dField % isVarArray) then
-!call mpas_log_write('DEBUGGING : copying the temporary array')
-                        field_3dreal_ptr % array(j,:,1:ownedSize) = real2d_temp(:,i:i+ownedSize-1)
+                        call io_streams_copy_field_3d_real_j(field_3dreal_ptr % array, j, 1, real2d_temp, i, ownedSize)
                      else
-                        field_3dreal_ptr % array(:,:,1:ownedSize) = real3d_temp(:,:,i:i+ownedSize-1)
+                        call io_streams_copy_field_3d_real(field_3dreal_ptr % array, 1, real3d_temp, i, ownedSize)
                      end if
                      i = i + ownedSize
                      field_3dreal_ptr => field_3dreal_ptr % next
                   end do
 
                else
-   
+
                   if (field_cursor % real3dField % isVarArray) then
                      call mpas_dmpar_bcast_reals( mpas_io_handle_dminfo(stream % fileHandle), size(real2d_temp), real2d_temp(:,1))
                      field_3dreal_ptr => field_cursor % real3dField
                      do while (associated(field_3dreal_ptr))
-                        field_3dreal_ptr % array(j,:,:) = real2d_temp(:,:)
+                        call io_streams_copy_field_3d_real_j(field_3dreal_ptr % array, j, 1, real2d_temp, 1, size(real2d_temp,2))
                         field_3dreal_ptr => field_3dreal_ptr % next
                      end do
                   else
                      call mpas_dmpar_bcast_reals( mpas_io_handle_dminfo(stream % fileHandle), size(real3d_temp), real3d_temp(:,1,1))
                      field_3dreal_ptr => field_cursor % real3dField
                      do while (associated(field_3dreal_ptr))
-                        field_3dreal_ptr % array(:,:,:) = real3d_temp(:,:,:)
+                        call io_streams_copy_field_3d_real(field_3dreal_ptr % array, 1, real3d_temp, 1, size(real3d_temp,3))
                         field_3dreal_ptr => field_3dreal_ptr % next
                      end do
                   end if
@@ -3068,29 +3399,28 @@ module mpas_io_streams
                      end if
 
                      if (field_cursor % real4dField % isVarArray) then
-!call mpas_log_write('DEBUGGING : copying the temporary array')
-                        field_4dreal_ptr % array(j, :,:,1:ownedSize) = real3d_temp(:,:,i:i+ownedSize-1)
+                        call io_streams_copy_field_4d_real_j(field_4dreal_ptr % array, j, 1, real3d_temp, i, ownedSize)
                      else
-                        field_4dreal_ptr % array(:,:,:,1:ownedSize) = real4d_temp(:,:,:,i:i+ownedSize-1)
+                        call io_streams_copy_field_4d_real(field_4dreal_ptr % array, 1, real4d_temp, i, ownedSize)
                      end if
                      i = i + ownedSize
                      field_4dreal_ptr => field_4dreal_ptr % next
                   end do
 
                else
-   
+
                   if (field_cursor % real4dField % isVarArray) then
                      call mpas_dmpar_bcast_reals( mpas_io_handle_dminfo(stream % fileHandle), size(real3d_temp), real3d_temp(:,1,1))
                      field_4dreal_ptr => field_cursor % real4dField
                      do while (associated(field_4dreal_ptr))
-                        field_4dreal_ptr % array(j,:,:,:) = real3d_temp(:,:,:)
+                        call io_streams_copy_field_4d_real_j(field_4dreal_ptr % array, j, 1, real3d_temp, 1, size(real3d_temp,3))
                         field_4dreal_ptr => field_4dreal_ptr % next
                      end do
                   else
                      call mpas_dmpar_bcast_reals( mpas_io_handle_dminfo(stream % fileHandle), size(real4d_temp), real4d_temp(:,1,1,1))
                      field_4dreal_ptr => field_cursor % real4dField
                      do while (associated(field_4dreal_ptr))
-                        field_4dreal_ptr % array(:,:,:,:) = real4d_temp(:,:,:,:)
+                        call io_streams_copy_field_4d_real(field_4dreal_ptr % array, 1, real4d_temp, 1, size(real4d_temp,4))
                         field_4dreal_ptr => field_4dreal_ptr % next
                      end do
                   end if
@@ -3158,29 +3488,28 @@ module mpas_io_streams
                      end if
 
                      if (field_cursor % real5dField % isVarArray) then
-!call mpas_log_write('DEBUGGING : copying the temporary array')
-                        field_5dreal_ptr % array(j,:,:,:,1:ownedSize) = real4d_temp(:,:,:,i:i+ownedSize-1)
+                        call io_streams_copy_field_5d_real_j(field_5dreal_ptr % array, j, 1, real4d_temp, i, ownedSize)
                      else
-                        field_5dreal_ptr % array(:,:,:,:,1:ownedSize) = real5d_temp(:,:,:,:,i:i+ownedSize-1)
+                        call io_streams_copy_field_5d_real(field_5dreal_ptr % array, 1, real5d_temp, i, ownedSize)
                      end if
                      i = i + ownedSize
                      field_5dreal_ptr => field_5dreal_ptr % next
                   end do
 
                else
-   
+
                   if (field_cursor % real5dField % isVarArray) then
                      call mpas_dmpar_bcast_reals( mpas_io_handle_dminfo(stream % fileHandle), size(real4d_temp), real4d_temp(:,1,1,1))
                      field_5dreal_ptr => field_cursor % real5dField
                      do while (associated(field_5dreal_ptr))
-                        field_5dreal_ptr % array(j,:,:,:,:) = real4d_temp(:,:,:,:)
+                        call io_streams_copy_field_5d_real_j(field_5dreal_ptr % array, j, 1, real4d_temp, 1, size(real4d_temp,4))
                         field_5dreal_ptr => field_5dreal_ptr % next
                      end do
                   else
                      call mpas_dmpar_bcast_reals( mpas_io_handle_dminfo(stream % fileHandle), size(real5d_temp), real5d_temp(:,1,1,1,1))
                      field_5dreal_ptr => field_cursor % real5dField
                      do while (associated(field_5dreal_ptr))
-                        field_5dreal_ptr % array(:,:,:,:,:) = real5d_temp(:,:,:,:,:)
+                        call io_streams_copy_field_5d_real(field_5dreal_ptr % array, 1, real5d_temp, 1, size(real5d_temp,5))
                         field_5dreal_ptr => field_5dreal_ptr % next
                      end do
                   end if
@@ -3249,6 +3578,329 @@ module mpas_io_streams
 !call mpas_log_write('Finished fieldlist loop...')
 
    end subroutine MPAS_readStream
+
+
+!***********************************************************************
+!
+!  io_streams_gather_field_* routines
+!
+!> \brief   Gather a field's array into a stream's host temp buffer before
+!>          it gets written out (the write-direction mirror of the
+!>          io_streams_copy_field_* routines used by MPAS_readStream).
+!> \details
+!>  Same "always pass whole arrays, index explicitly inside the region"
+!>  rationale as the read-side helpers -- avoids ever passing a Fortran
+!>  array section as an actual argument, which could otherwise silently
+!>  disconnect the dummy from whatever OpenACC device presence the real
+!>  array has.
+!>
+!>  "src" here is always the field's array -- the thing with persistent
+!>  device residence in an OPENACC_GPU_RESIDENT build -- and always gets
+!>  a plain, unrestricted "copyin(src)". "dst" is always the host-only
+!>  temp write buffer, and gets "copyout(dst(...))" restricted to just the
+!>  range this call actually populates, since the temp buffer can be much
+!>  larger (all-blocks-concatenated) than what a single call needs.
+!
+!-----------------------------------------------------------------------
+   subroutine io_streams_gather_field_1d_int(dst, dstStart, src, srcStart, n)!{{{
+      integer, dimension(:) :: dst
+      integer, intent(in) :: dstStart
+      integer, dimension(:), intent(in) :: src
+      integer, intent(in) :: srcStart
+      integer, intent(in) :: n
+
+      integer :: k
+
+      !$acc parallel loop copyout(dst(dstStart:dstStart+n-1)) copyin(src)
+      do k = 0, n-1
+         dst(dstStart+k) = src(srcStart+k)
+      end do
+      !$acc end parallel loop
+   end subroutine io_streams_gather_field_1d_int!}}}
+
+   subroutine io_streams_gather_field_2d_int(dst, dstStart, src, srcStart, n)!{{{
+      integer, dimension(:,:) :: dst
+      integer, intent(in) :: dstStart
+      integer, dimension(:,:), intent(in) :: src
+      integer, intent(in) :: srcStart
+      integer, intent(in) :: n
+
+      integer :: k1, k2, n1
+
+      n1 = size(src,1)
+
+      !$acc parallel loop collapse(2) copyout(dst(:,dstStart:dstStart+n-1)) copyin(src)
+      do k2 = 0, n-1
+         do k1 = 1, n1
+            dst(k1, dstStart+k2) = src(k1, srcStart+k2)
+         end do
+      end do
+      !$acc end parallel loop
+   end subroutine io_streams_gather_field_2d_int!}}}
+
+   subroutine io_streams_gather_field_2d_int_j(dst, dstStart, src, j, srcStart, n)!{{{
+      integer, dimension(:) :: dst
+      integer, intent(in) :: dstStart
+      integer, dimension(:,:), intent(in) :: src
+      integer, intent(in) :: j
+      integer, intent(in) :: srcStart
+      integer, intent(in) :: n
+
+      integer :: k
+
+      !$acc parallel loop copyout(dst(dstStart:dstStart+n-1)) copyin(src)
+      do k = 0, n-1
+         dst(dstStart+k) = src(j, srcStart+k)
+      end do
+      !$acc end parallel loop
+   end subroutine io_streams_gather_field_2d_int_j!}}}
+
+   subroutine io_streams_gather_field_3d_int(dst, dstStart, src, srcStart, n)!{{{
+      integer, dimension(:,:,:) :: dst
+      integer, intent(in) :: dstStart
+      integer, dimension(:,:,:), intent(in) :: src
+      integer, intent(in) :: srcStart
+      integer, intent(in) :: n
+
+      integer :: k1, k2, k3, n1, n2
+
+      n1 = size(src,1)
+      n2 = size(src,2)
+
+      !$acc parallel loop collapse(3) copyout(dst(:,:,dstStart:dstStart+n-1)) copyin(src)
+      do k3 = 0, n-1
+         do k2 = 1, n2
+            do k1 = 1, n1
+               dst(k1, k2, dstStart+k3) = src(k1, k2, srcStart+k3)
+            end do
+         end do
+      end do
+      !$acc end parallel loop
+   end subroutine io_streams_gather_field_3d_int!}}}
+
+   subroutine io_streams_gather_field_3d_int_j(dst, dstStart, src, j, srcStart, n)!{{{
+      integer, dimension(:,:) :: dst
+      integer, intent(in) :: dstStart
+      integer, dimension(:,:,:), intent(in) :: src
+      integer, intent(in) :: j
+      integer, intent(in) :: srcStart
+      integer, intent(in) :: n
+
+      integer :: k1, k2, n1
+
+      n1 = size(src,2)
+
+      !$acc parallel loop collapse(2) copyout(dst(:,dstStart:dstStart+n-1)) copyin(src)
+      do k2 = 0, n-1
+         do k1 = 1, n1
+            dst(k1, dstStart+k2) = src(j, k1, srcStart+k2)
+         end do
+      end do
+      !$acc end parallel loop
+   end subroutine io_streams_gather_field_3d_int_j!}}}
+
+   subroutine io_streams_gather_field_1d_real(dst, dstStart, src, srcStart, n)!{{{
+      real (kind=RKIND), dimension(:) :: dst
+      integer, intent(in) :: dstStart
+      real (kind=RKIND), dimension(:), intent(in) :: src
+      integer, intent(in) :: srcStart
+      integer, intent(in) :: n
+
+      integer :: k
+
+      !$acc parallel loop copyout(dst(dstStart:dstStart+n-1)) copyin(src)
+      do k = 0, n-1
+         dst(dstStart+k) = src(srcStart+k)
+      end do
+      !$acc end parallel loop
+   end subroutine io_streams_gather_field_1d_real!}}}
+
+   subroutine io_streams_gather_field_2d_real(dst, dstStart, src, srcStart, n)!{{{
+      real (kind=RKIND), dimension(:,:) :: dst
+      integer, intent(in) :: dstStart
+      real (kind=RKIND), dimension(:,:), intent(in) :: src
+      integer, intent(in) :: srcStart
+      integer, intent(in) :: n
+
+      integer :: k1, k2, n1
+
+      n1 = size(src,1)
+
+      !$acc parallel loop collapse(2) copyout(dst(:,dstStart:dstStart+n-1)) copyin(src)
+      do k2 = 0, n-1
+         do k1 = 1, n1
+            dst(k1, dstStart+k2) = src(k1, srcStart+k2)
+         end do
+      end do
+      !$acc end parallel loop
+   end subroutine io_streams_gather_field_2d_real!}}}
+
+   subroutine io_streams_gather_field_2d_real_j(dst, dstStart, src, j, srcStart, n)!{{{
+      real (kind=RKIND), dimension(:) :: dst
+      integer, intent(in) :: dstStart
+      real (kind=RKIND), dimension(:,:), intent(in) :: src
+      integer, intent(in) :: j
+      integer, intent(in) :: srcStart
+      integer, intent(in) :: n
+
+      integer :: k
+
+      !$acc parallel loop copyout(dst(dstStart:dstStart+n-1)) copyin(src)
+      do k = 0, n-1
+         dst(dstStart+k) = src(j, srcStart+k)
+      end do
+      !$acc end parallel loop
+   end subroutine io_streams_gather_field_2d_real_j!}}}
+
+   subroutine io_streams_gather_field_3d_real(dst, dstStart, src, srcStart, n)!{{{
+      real (kind=RKIND), dimension(:,:,:) :: dst
+      integer, intent(in) :: dstStart
+      real (kind=RKIND), dimension(:,:,:), intent(in) :: src
+      integer, intent(in) :: srcStart
+      integer, intent(in) :: n
+
+      integer :: k1, k2, k3, n1, n2
+
+      n1 = size(src,1)
+      n2 = size(src,2)
+
+      !$acc parallel loop collapse(3) copyout(dst(:,:,dstStart:dstStart+n-1)) copyin(src)
+      do k3 = 0, n-1
+         do k2 = 1, n2
+            do k1 = 1, n1
+               dst(k1, k2, dstStart+k3) = src(k1, k2, srcStart+k3)
+            end do
+         end do
+      end do
+      !$acc end parallel loop
+   end subroutine io_streams_gather_field_3d_real!}}}
+
+   subroutine io_streams_gather_field_3d_real_j(dst, dstStart, src, j, srcStart, n)!{{{
+      real (kind=RKIND), dimension(:,:) :: dst
+      integer, intent(in) :: dstStart
+      real (kind=RKIND), dimension(:,:,:), intent(in) :: src
+      integer, intent(in) :: j
+      integer, intent(in) :: srcStart
+      integer, intent(in) :: n
+
+      integer :: k1, k2, n1
+
+      n1 = size(src,2)
+
+      !$acc parallel loop collapse(2) copyout(dst(:,dstStart:dstStart+n-1)) copyin(src)
+      do k2 = 0, n-1
+         do k1 = 1, n1
+            dst(k1, dstStart+k2) = src(j, k1, srcStart+k2)
+         end do
+      end do
+      !$acc end parallel loop
+   end subroutine io_streams_gather_field_3d_real_j!}}}
+
+   subroutine io_streams_gather_field_4d_real(dst, dstStart, src, srcStart, n)!{{{
+      real (kind=RKIND), dimension(:,:,:,:) :: dst
+      integer, intent(in) :: dstStart
+      real (kind=RKIND), dimension(:,:,:,:), intent(in) :: src
+      integer, intent(in) :: srcStart
+      integer, intent(in) :: n
+
+      integer :: k1, k2, k3, k4, n1, n2, n3
+
+      n1 = size(src,1)
+      n2 = size(src,2)
+      n3 = size(src,3)
+
+      !$acc parallel loop collapse(4) copyout(dst(:,:,:,dstStart:dstStart+n-1)) copyin(src)
+      do k4 = 0, n-1
+         do k3 = 1, n3
+            do k2 = 1, n2
+               do k1 = 1, n1
+                  dst(k1, k2, k3, dstStart+k4) = src(k1, k2, k3, srcStart+k4)
+               end do
+            end do
+         end do
+      end do
+      !$acc end parallel loop
+   end subroutine io_streams_gather_field_4d_real!}}}
+
+   subroutine io_streams_gather_field_4d_real_j(dst, dstStart, src, j, srcStart, n)!{{{
+      real (kind=RKIND), dimension(:,:,:) :: dst
+      integer, intent(in) :: dstStart
+      real (kind=RKIND), dimension(:,:,:,:), intent(in) :: src
+      integer, intent(in) :: j
+      integer, intent(in) :: srcStart
+      integer, intent(in) :: n
+
+      integer :: k1, k2, k3, n1, n2
+
+      n1 = size(src,2)
+      n2 = size(src,3)
+
+      !$acc parallel loop collapse(3) copyout(dst(:,:,dstStart:dstStart+n-1)) copyin(src)
+      do k3 = 0, n-1
+         do k2 = 1, n2
+            do k1 = 1, n1
+               dst(k1, k2, dstStart+k3) = src(j, k1, k2, srcStart+k3)
+            end do
+         end do
+      end do
+      !$acc end parallel loop
+   end subroutine io_streams_gather_field_4d_real_j!}}}
+
+   subroutine io_streams_gather_field_5d_real(dst, dstStart, src, srcStart, n)!{{{
+      real (kind=RKIND), dimension(:,:,:,:,:) :: dst
+      integer, intent(in) :: dstStart
+      real (kind=RKIND), dimension(:,:,:,:,:), intent(in) :: src
+      integer, intent(in) :: srcStart
+      integer, intent(in) :: n
+
+      integer :: k1, k2, k3, k4, k5, n1, n2, n3, n4
+
+      n1 = size(src,1)
+      n2 = size(src,2)
+      n3 = size(src,3)
+      n4 = size(src,4)
+
+      !$acc parallel loop collapse(5) copyout(dst(:,:,:,:,dstStart:dstStart+n-1)) copyin(src)
+      do k5 = 0, n-1
+         do k4 = 1, n4
+            do k3 = 1, n3
+               do k2 = 1, n2
+                  do k1 = 1, n1
+                     dst(k1, k2, k3, k4, dstStart+k5) = src(k1, k2, k3, k4, srcStart+k5)
+                  end do
+               end do
+            end do
+         end do
+      end do
+      !$acc end parallel loop
+   end subroutine io_streams_gather_field_5d_real!}}}
+
+   subroutine io_streams_gather_field_5d_real_j(dst, dstStart, src, j, srcStart, n)!{{{
+      real (kind=RKIND), dimension(:,:,:,:) :: dst
+      integer, intent(in) :: dstStart
+      real (kind=RKIND), dimension(:,:,:,:,:), intent(in) :: src
+      integer, intent(in) :: j
+      integer, intent(in) :: srcStart
+      integer, intent(in) :: n
+
+      integer :: k1, k2, k3, k4, n1, n2, n3
+
+      n1 = size(src,2)
+      n2 = size(src,3)
+      n3 = size(src,4)
+
+      !$acc parallel loop collapse(4) copyout(dst(:,:,:,dstStart:dstStart+n-1)) copyin(src)
+      do k4 = 0, n-1
+         do k3 = 1, n3
+            do k2 = 1, n2
+               do k1 = 1, n1
+                  dst(k1, k2, k3, dstStart+k4) = src(j, k1, k2, k3, srcStart+k4)
+               end do
+            end do
+         end do
+      end do
+      !$acc end parallel loop
+   end subroutine io_streams_gather_field_5d_real_j!}}}
 
 
    subroutine MPAS_writeStream(stream, frame, ierr)
@@ -3379,7 +4031,7 @@ module mpas_io_streams
 ! I suspect we will never hit this code, as it doesn't make sense, really
                         int0d_temp = field_1dint_ptr % array(j)
                      else
-                        int1d_temp(i:i+ownedSize-1) = field_1dint_ptr % array(1:ownedSize)
+                        call io_streams_gather_field_1d_int(int1d_temp, i, field_1dint_ptr % array, 1, ownedSize)
                      end if
                      i = i + ownedSize
                      if ( .not. stream % blockWrite ) then
@@ -3392,7 +4044,7 @@ module mpas_io_streams
                   if (field_cursor % int1dField % isVarArray) then
                      int0d_temp = field_cursor % int1dField % array(j)
                   else
-                     int1d_temp(:) = field_cursor % int1dField % array(:)
+                     call io_streams_gather_field_1d_int(int1d_temp, 1, field_cursor % int1dField % array, 1, size(int1d_temp))
                   end if
                end if
 
@@ -3440,9 +4092,9 @@ module mpas_io_streams
                      end if
 
                      if (field_cursor % int2dField % isVarArray) then
-                        int1d_temp(i:i+ownedSize-1) = field_2dint_ptr % array(j,1:ownedSize)
+                        call io_streams_gather_field_2d_int_j(int1d_temp, i, field_2dint_ptr % array, j, 1, ownedSize)
                      else
-                        int2d_temp(:,i:i+ownedSize-1) = field_2dint_ptr % array(:,1:ownedSize)
+                        call io_streams_gather_field_2d_int(int2d_temp, i, field_2dint_ptr % array, 1, ownedSize)
                      end if
                      i = i + ownedSize
                      if ( .not. stream % blockWrite ) then
@@ -3453,9 +4105,9 @@ module mpas_io_streams
                   end do
                else
                   if (field_cursor % int2dField % isVarArray) then
-                     int1d_temp(:) = field_cursor % int2dField % array(j,:)
+                     call io_streams_gather_field_2d_int_j(int1d_temp, 1, field_cursor % int2dField % array, j, 1, size(int1d_temp))
                   else
-                     int2d_temp(:,:) = field_cursor % int2dField % array(:,:)
+                     call io_streams_gather_field_2d_int(int2d_temp, 1, field_cursor % int2dField % array, 1, size(int2d_temp,2))
                   end if
                end if
 
@@ -3507,9 +4159,9 @@ module mpas_io_streams
                      end if
 
                      if (field_cursor % int3dField % isVarArray) then
-                        int2d_temp(:,i:i+ownedSize-1) = field_3dint_ptr % array(j,:,1:ownedSize)
+                        call io_streams_gather_field_3d_int_j(int2d_temp, i, field_3dint_ptr % array, j, 1, ownedSize)
                      else
-                        int3d_temp(:,:,i:i+ownedSize-1) = field_3dint_ptr % array(:,:,1:ownedSize)
+                        call io_streams_gather_field_3d_int(int3d_temp, i, field_3dint_ptr % array, 1, ownedSize)
                      end if
                      i = i + ownedSize
                      if ( .not. stream % blockWrite ) then
@@ -3520,9 +4172,9 @@ module mpas_io_streams
                   end do
                else
                   if (field_cursor % int3dField % isVarArray) then
-                     int2d_temp(:,:) = field_cursor % int3dField % array(j,:,:)
+                     call io_streams_gather_field_3d_int_j(int2d_temp, 1, field_cursor % int3dField % array, j, 1, size(int2d_temp,2))
                   else
-                     int3d_temp(:,:,:) = field_cursor % int3dField % array(:,:,:)
+                     call io_streams_gather_field_3d_int(int3d_temp, 1, field_cursor % int3dField % array, 1, size(int3d_temp,3))
                   end if
                end if
 
@@ -3587,7 +4239,7 @@ module mpas_io_streams
 ! I suspect we will never hit this code, as it doesn't make sense, really
                         real0d_temp = field_1dreal_ptr % array(j)
                      else
-                        real1d_temp(i:i+ownedSize-1) = field_1dreal_ptr % array(1:ownedSize)
+                        call io_streams_gather_field_1d_real(real1d_temp, i, field_1dreal_ptr % array, 1, ownedSize)
                      end if
                      i = i + ownedSize
                      if ( .not. stream % blockWrite ) then
@@ -3600,7 +4252,7 @@ module mpas_io_streams
                   if (field_cursor % real1dField % isVarArray) then
                      real0d_temp = field_cursor % real1dField % array(j)
                   else
-                     real1d_temp(:) = field_cursor % real1dField % array(:)
+                     call io_streams_gather_field_1d_real(real1d_temp, 1, field_cursor % real1dField % array, 1, size(real1d_temp))
                   end if
                end if
 
@@ -3648,9 +4300,9 @@ module mpas_io_streams
                      end if
 
                      if (field_cursor % real2dField % isVarArray) then
-                        real1d_temp(i:i+ownedSize-1) = field_2dreal_ptr % array(j,1:ownedSize)
+                        call io_streams_gather_field_2d_real_j(real1d_temp, i, field_2dreal_ptr % array, j, 1, ownedSize)
                      else
-                        real2d_temp(:,i:i+ownedSize-1) = field_2dreal_ptr % array(:,1:ownedSize)
+                        call io_streams_gather_field_2d_real(real2d_temp, i, field_2dreal_ptr % array, 1, ownedSize)
                      end if
                      i = i + ownedSize
                      if ( .not. stream % blockWrite ) then
@@ -3661,9 +4313,9 @@ module mpas_io_streams
                   end do
                else
                   if (field_cursor % real2dField % isVarArray) then
-                     real1d_temp(:) = field_cursor % real2dField % array(j,:)
+                     call io_streams_gather_field_2d_real_j(real1d_temp, 1, field_cursor % real2dField % array, j, 1, size(real1d_temp))
                   else
-                     real2d_temp(:,:) = field_cursor % real2dField % array(:,:)
+                     call io_streams_gather_field_2d_real(real2d_temp, 1, field_cursor % real2dField % array, 1, size(real2d_temp,2))
                   end if
                end if
 
@@ -3715,9 +4367,9 @@ module mpas_io_streams
                      end if
 
                      if (field_cursor % real3dField % isVarArray) then
-                        real2d_temp(:,i:i+ownedSize-1) = field_3dreal_ptr % array(j,:,1:ownedSize)
+                        call io_streams_gather_field_3d_real_j(real2d_temp, i, field_3dreal_ptr % array, j, 1, ownedSize)
                      else
-                        real3d_temp(:,:,i:i+ownedSize-1) = field_3dreal_ptr % array(:,:,1:ownedSize)
+                        call io_streams_gather_field_3d_real(real3d_temp, i, field_3dreal_ptr % array, 1, ownedSize)
                      end if
                      i = i + ownedSize
                      if ( .not. stream % blockWrite ) then
@@ -3728,9 +4380,9 @@ module mpas_io_streams
                   end do
                else
                   if (field_cursor % real3dField % isVarArray) then
-                     real2d_temp(:,:) = field_cursor % real3dField % array(j,:,:)
+                     call io_streams_gather_field_3d_real_j(real2d_temp, 1, field_cursor % real3dField % array, j, 1, size(real2d_temp,2))
                   else
-                     real3d_temp(:,:,:) = field_cursor % real3dField % array(:,:,:)
+                     call io_streams_gather_field_3d_real(real3d_temp, 1, field_cursor % real3dField % array, 1, size(real3d_temp,3))
                   end if
                end if
 
@@ -3784,9 +4436,9 @@ module mpas_io_streams
                      end if
 
                      if (field_cursor % real4dField % isVarArray) then
-                        real3d_temp(:,:,i:i+ownedSize-1) = field_4dreal_ptr % array(j,:,:,1:ownedSize)
+                        call io_streams_gather_field_4d_real_j(real3d_temp, i, field_4dreal_ptr % array, j, 1, ownedSize)
                      else
-                        real4d_temp(:,:,:,i:i+ownedSize-1) = field_4dreal_ptr % array(:,:,:,1:ownedSize)
+                        call io_streams_gather_field_4d_real(real4d_temp, i, field_4dreal_ptr % array, 1, ownedSize)
                      end if
                      i = i + ownedSize
                      if ( .not. stream % blockWrite ) then
@@ -3797,9 +4449,9 @@ module mpas_io_streams
                   end do
                else
                   if (field_cursor % real4dField % isVarArray) then
-                     real3d_temp(:,:,:) = field_cursor % real4dField % array(j,:,:,:)
+                     call io_streams_gather_field_4d_real_j(real3d_temp, 1, field_cursor % real4dField % array, j, 1, size(real3d_temp,3))
                   else
-                     real4d_temp(:,:,:,:) = field_cursor % real4dField % array(:,:,:,:)
+                     call io_streams_gather_field_4d_real(real4d_temp, 1, field_cursor % real4dField % array, 1, size(real4d_temp,4))
                   end if
                end if
 
@@ -3855,9 +4507,9 @@ module mpas_io_streams
                      end if
 
                      if (field_cursor % real5dField % isVarArray) then
-                        real4d_temp(:,:,:,i:i+ownedSize-1) = field_5dreal_ptr % array(j,:,:,:,1:ownedSize)
+                        call io_streams_gather_field_5d_real_j(real4d_temp, i, field_5dreal_ptr % array, j, 1, ownedSize)
                      else
-                        real5d_temp(:,:,:,:,i:i+ownedSize-1) = field_5dreal_ptr % array(:,:,:,:,1:ownedSize)
+                        call io_streams_gather_field_5d_real(real5d_temp, i, field_5dreal_ptr % array, 1, ownedSize)
                      end if
                      i = i + ownedSize
                      if ( .not. stream % blockWrite ) then
@@ -3868,9 +4520,9 @@ module mpas_io_streams
                   end do
                else
                   if (field_cursor % real5dField % isVarArray) then
-                     real4d_temp(:,:,:,:) = field_cursor % real5dField % array(j,:,:,:,:)
+                     call io_streams_gather_field_5d_real_j(real4d_temp, 1, field_cursor % real5dField % array, j, 1, size(real4d_temp,4))
                   else
-                     real5d_temp(:,:,:,:,:) = field_cursor % real5dField % array(:,:,:,:,:)
+                     call io_streams_gather_field_5d_real(real5d_temp, 1, field_cursor % real5dField % array, 1, size(real5d_temp,5))
                   end if
                end if
 
