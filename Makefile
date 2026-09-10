@@ -35,6 +35,7 @@ gnu:   # BUILDTARGET GNU Fortran, C, and C++ compilers
 	"USE_PAPI = $(USE_PAPI)" \
 	"OPENMP = $(OPENMP)" \
 	"OPENACC = $(OPENACC)" \
+	"MPAS_NVTX = $(MPAS_NVTX)" \
 	"CPPFLAGS = $(MODEL_FORMULATION) -D_MPI" )
 
 xlf:   # BUILDTARGET IBM XL compilers
@@ -117,6 +118,7 @@ ftn:   # BUILDTARGET Cray compilers
 	"USE_PAPI = $(USE_PAPI)" \
 	"OPENMP = $(OPENMP)" \
 	"OPENACC = $(OPENACC)" \
+	"MPAS_NVTX = $(MPAS_NVTX)" \
 	"CPPFLAGS = $(MODEL_FORMULATION) -D_MPI" )
 
 titan-cray:   # BUILDTARGET (deprecated) Cray compilers with options for ORNL Titan
@@ -166,6 +168,7 @@ nvhpc:   # BUILDTARGET NVIDIA HPC SDK
 	"USE_PAPI = $(USE_PAPI)" \
 	"OPENMP = $(OPENMP)" \
 	"OPENACC = $(OPENACC)" \
+	"MPAS_NVTX = $(MPAS_NVTX)" \
 	"CPPFLAGS = $(MODEL_FORMULATION) -D_MPI -DCPRPGI" )
 
 pgi:   # BUILDTARGET PGI compiler suite
@@ -196,6 +199,7 @@ pgi:   # BUILDTARGET PGI compiler suite
 	"USE_PAPI = $(USE_PAPI)" \
 	"OPENMP = $(OPENMP)" \
 	"OPENACC = $(OPENACC)" \
+	"MPAS_NVTX = $(MPAS_NVTX)" \
 	"CPPFLAGS = $(MODEL_FORMULATION) -D_MPI -DCPRPGI" )
 
 pgi-summit:   # BUILDTARGET PGI compiler suite w/OpenACC options for ORNL Summit
@@ -226,6 +230,7 @@ pgi-summit:   # BUILDTARGET PGI compiler suite w/OpenACC options for ORNL Summit
 	"USE_PAPI = $(USE_PAPI)" \
 	"OPENMP = $(OPENMP)" \
 	"OPENACC = $(OPENACC)" \
+	"MPAS_NVTX = $(MPAS_NVTX)" \
 	"CPPFLAGS = -DpgiFortran -D_MPI -DUNDERSCORE" )
 
 pgi-nersc:   # BUILDTARGET (deprecated) PGI compilers on NERSC machines
@@ -406,6 +411,7 @@ gfortran:   # BUILDTARGET GNU Fortran, C, and C++ compilers
 	"USE_PAPI = $(USE_PAPI)" \
 	"OPENMP = $(OPENMP)" \
 	"OPENACC = $(OPENACC)" \
+	"MPAS_NVTX = $(MPAS_NVTX)" \
 	"CPPFLAGS = $(MODEL_FORMULATION) -D_MPI" )
 
 gfortran-clang:   # BUILDTARGET GNU Fortran compiler with LLVM clang/clang++ compilers
@@ -877,6 +883,11 @@ ifeq "$(OPENACC)" "true"
         LDFLAGS += $(FFLAGS_ACC)
 endif #OPENACC IF
 
+ifeq "$(MPAS_NVTX)" "true"
+        override CPPFLAGS += "-DMPAS_NVTX"
+        override LIBS += "-lnvhpcwrapnvtx"
+endif #MPAS_NVTX IF
+
 ifeq "$(OPENMP_OFFLOAD)" "true"
 	FFLAGS += $(FFLAGS_GPU)
 	CFLAGS += $(FFLAGS_GPU)
@@ -997,6 +1008,12 @@ ifeq "$(OPENACC)" "true"
 	OPENACC_MESSAGE="MPAS was built with OpenACC accelerator support enabled."
 else
 	OPENACC_MESSAGE="MPAS was built without OpenACC accelerator support."
+endif
+
+ifeq "$(MPAS_NVTX)" "true"
+	NVTX_MESSAGE="MPAS was built with NVTX profiling regions enabled."
+else
+	NVTX_MESSAGE="MPAS was built without NVTX profiling regions."
 endif
 
 
@@ -1572,6 +1589,7 @@ mpas_main: $(MAIN_DEPS)
 	@echo $(OPENMP_MESSAGE)
 	@echo $(OPENMP_OFFLOAD_MESSAGE)
 	@echo $(OPENACC_MESSAGE)
+	@echo $(NVTX_MESSAGE)
 	@echo $(MUSICA_MESSAGE)
 	@echo $(SCOTCH_MESSAGE)
 	@echo $(SHAREDLIB_MESSAGE)
@@ -1636,6 +1654,7 @@ errmsg:
 	@echo "                    TIMER_LIB=tau - Uses TAU for the timer interface instead of the native interface"
 	@echo "    OPENMP=true   - builds and links with OpenMP flags. Default is to not use OpenMP."
 	@echo "    OPENACC=true  - builds and links with OpenACC flags. Default is to not use OpenACC."
+	@echo "    MPAS_NVTX=true - instruments all MPAS timers with NVTX profiling regions (requires nvhpc). Default is to not use NVTX."
 	@echo "    PRECISION=double - builds with default double-precision real kind. Default is to use single-precision."
 	@echo "    SHAREDLIB=true - generate position-independent code suitable for use in a shared library. Default is false."
 	@echo "    MPAS_ESMF=opt  - Selects the ESMF library to be used for MPAS. Options are:"

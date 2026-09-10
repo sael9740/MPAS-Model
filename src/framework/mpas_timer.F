@@ -35,6 +35,10 @@
         use gptl
 #endif
 
+#ifdef MPAS_NVTX
+        use nvtx
+#endif
+
         implicit none
         save
 
@@ -120,6 +124,10 @@
 
 #ifdef MPAS_GPTL_TIMERS
           iErr = gptlstart(trimmed_name)
+#endif
+
+#ifdef MPAS_NVTX
+          call nvtxStartRange(trimmed_name)
 #endif
 
 #ifdef MPAS_NATIVE_TIMERS
@@ -265,6 +273,10 @@
 
 #ifdef MPAS_GPTL_TIMERS
           iErr = gptlstop(trimmed_name)
+#endif
+
+#ifdef MPAS_NVTX
+          call nvtxEndRange()
 #endif
 
 #ifdef MPAS_NATIVE_TIMERS
