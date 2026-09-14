@@ -4,6 +4,15 @@ ifneq "${MPAS_SHELL}" ""
         SHELL = ${MPAS_SHELL}
 endif
 
+# GPU_MEM_MANAGED=true appends the "mem:managed" suboption to the nvhpc build
+# target's -gpu= flag, so OpenACC allocations use CUDA Managed Memory instead
+# of the default discrete/separate host-device memory model.
+ifeq "$(GPU_MEM_MANAGED)" "true"
+        ACC_MEM_MODE = ,mem:managed
+else
+        ACC_MEM_MODE =
+endif
+
 dummy:
 	( $(MAKE) error )
 
@@ -159,7 +168,7 @@ nvhpc:   # BUILDTARGET NVIDIA HPC SDK
 	"LDFLAGS_DEBUG = -O0 -g -Mbounds -Ktrap=divz,fp,inv,ovf -traceback" \
 	"FFLAGS_OMP = -mp" \
 	"CFLAGS_OMP = -mp" \
-	"FFLAGS_ACC = -Mnofma -acc -gpu=cc70,cc80 -Minfo=accel" \
+	"FFLAGS_ACC = -Mnofma -acc -gpu=cc70,cc80$(ACC_MEM_MODE) -Minfo=accel" \
 	"CFLAGS_ACC =" \
 	"PICFLAG = -fpic" \
 	"BUILD_TARGET = $(@)" \
@@ -169,6 +178,7 @@ nvhpc:   # BUILDTARGET NVIDIA HPC SDK
 	"OPENMP = $(OPENMP)" \
 	"OPENACC = $(OPENACC)" \
 	"MPAS_NVTX = $(MPAS_NVTX)" \
+	"GPU_MEM_MANAGED = $(GPU_MEM_MANAGED)" \
 	"CPPFLAGS = $(MODEL_FORMULATION) -D_MPI -DCPRPGI" )
 
 pgi:   # BUILDTARGET PGI compiler suite
@@ -1655,6 +1665,7 @@ errmsg:
 	@echo "    OPENMP=true   - builds and links with OpenMP flags. Default is to not use OpenMP."
 	@echo "    OPENACC=true  - builds and links with OpenACC flags. Default is to not use OpenACC."
 	@echo "    MPAS_NVTX=true - instruments all MPAS timers with NVTX profiling regions (requires nvhpc). Default is to not use NVTX."
+	@echo "    GPU_MEM_MANAGED=true - builds OpenACC code with CUDA Managed Memory (-gpu=mem:managed) instead of the default discrete/separate memory model (requires nvhpc). Default is to not use managed memory."
 	@echo "    PRECISION=double - builds with default double-precision real kind. Default is to use single-precision."
 	@echo "    SHAREDLIB=true - generate position-independent code suitable for use in a shared library. Default is false."
 	@echo "    MPAS_ESMF=opt  - Selects the ESMF library to be used for MPAS. Options are:"
