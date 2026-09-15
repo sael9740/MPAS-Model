@@ -2175,6 +2175,7 @@ module atm_time_integration
 
 
 
+      call mpas_timer_start('DYNAMICS_SUBSTEPS')
       DYNAMICS_SUBSTEPS : do dynamics_substep = 1, dynamics_split
 
          !  Compute the coefficients for the vertically implicit solve in the acoustic step.
@@ -2655,6 +2656,7 @@ module atm_time_integration
          call mpas_timer_stop('atm_rk_dynamics_substep_finish')
 
       end do DYNAMICS_SUBSTEPS
+      call mpas_timer_stop('DYNAMICS_SUBSTEPS')
 
 
       deallocate(qtot)  !  we are finished with these now
