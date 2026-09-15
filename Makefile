@@ -168,8 +168,10 @@ nvhpc:   # BUILDTARGET NVIDIA HPC SDK
 	"LDFLAGS_DEBUG = -O0 -g -Mbounds -Ktrap=divz,fp,inv,ovf -traceback" \
 	"FFLAGS_OMP = -mp" \
 	"CFLAGS_OMP = -mp" \
-	"FFLAGS_ACC = -Mnofma -acc -gpu=cc70,cc80$(ACC_MEM_MODE) -Minfo=accel" \
+	"FFLAGS_ACC = -Mnofma -acc=host,gpu -gpu=cc90$(ACC_MEM_MODE) -Minfo=accel" \
 	"CFLAGS_ACC =" \
+	"FFLAGS_NVHPC_ACC_BFB = -Mnofma -gpu=math_uniform" \
+	"FFLAGS_NVHPC_BFB = -Mnofma" \
 	"PICFLAG = -fpic" \
 	"BUILD_TARGET = $(@)" \
 	"CORE = $(CORE)" \
@@ -179,6 +181,7 @@ nvhpc:   # BUILDTARGET NVIDIA HPC SDK
 	"OPENACC = $(OPENACC)" \
 	"MPAS_NVTX = $(MPAS_NVTX)" \
 	"GPU_MEM_MANAGED = $(GPU_MEM_MANAGED)" \
+	"NVHPC_BFB = $(NVHPC_BFB)" \
 	"CPPFLAGS = $(MODEL_FORMULATION) -D_MPI -DCPRPGI" )
 
 pgi:   # BUILDTARGET PGI compiler suite
@@ -893,6 +896,20 @@ ifeq "$(OPENACC)" "true"
         LDFLAGS += $(FFLAGS_ACC)
 endif #OPENACC IF
 
+# NVHPC_BFB=true keeps nvhpc GPU builds bit-for-bit reproducible against
+# nvhpc CPU builds: -Mnofma disables fused multiply-add (the dominant source
+# of CPU/GPU floating-point differences), and -gpu=math_uniform additionally
+# forces uniform (non-fast-math) GPU math library routines when OPENACC=true.
+ifeq "$(NVHPC_BFB)" "true"
+ifeq "$(OPENACC)" "true"
+        FFLAGS += $(FFLAGS_NVHPC_ACC_BFB)
+        LDFLAGS += $(FFLAGS_NVHPC_ACC_BFB)
+else
+        FFLAGS += $(FFLAGS_NVHPC_BFB)
+        LDFLAGS += $(FFLAGS_NVHPC_BFB)
+endif
+endif #NVHPC_BFB IF
+
 ifeq "$(MPAS_NVTX)" "true"
         override CPPFLAGS += "-DMPAS_NVTX"
         override LIBS += "-lnvhpcwrapnvtx"
@@ -1024,6 +1041,12 @@ ifeq "$(MPAS_NVTX)" "true"
 	NVTX_MESSAGE="MPAS was built with NVTX profiling regions enabled."
 else
 	NVTX_MESSAGE="MPAS was built without NVTX profiling regions."
+endif
+
+ifeq "$(NVHPC_BFB)" "true"
+	NVHPC_BFB_MESSAGE="MPAS was built with nvhpc bit-for-bit reproducibility flags enabled."
+else
+	NVHPC_BFB_MESSAGE="MPAS was built without nvhpc bit-for-bit reproducibility flags."
 endif
 
 
@@ -1600,6 +1623,7 @@ mpas_main: $(MAIN_DEPS)
 	@echo $(OPENMP_OFFLOAD_MESSAGE)
 	@echo $(OPENACC_MESSAGE)
 	@echo $(NVTX_MESSAGE)
+	@echo $(NVHPC_BFB_MESSAGE)
 	@echo $(MUSICA_MESSAGE)
 	@echo $(SCOTCH_MESSAGE)
 	@echo $(SHAREDLIB_MESSAGE)
@@ -1666,6 +1690,7 @@ errmsg:
 	@echo "    OPENACC=true  - builds and links with OpenACC flags. Default is to not use OpenACC."
 	@echo "    MPAS_NVTX=true - instruments all MPAS timers with NVTX profiling regions (requires nvhpc). Default is to not use NVTX."
 	@echo "    GPU_MEM_MANAGED=true - builds OpenACC code with CUDA Managed Memory (-gpu=mem:managed) instead of the default discrete/separate memory model (requires nvhpc). Default is to not use managed memory."
+	@echo "    NVHPC_BFB=true - adds -Mnofma (CPU/GPU) and -gpu=math_uniform (GPU) so nvhpc GPU builds are bit-for-bit reproducible against nvhpc CPU builds (requires nvhpc). Default is off."
 	@echo "    PRECISION=double - builds with default double-precision real kind. Default is to use single-precision."
 	@echo "    SHAREDLIB=true - generate position-independent code suitable for use in a shared library. Default is false."
 	@echo "    MPAS_ESMF=opt  - Selects the ESMF library to be used for MPAS. Options are:"
