@@ -633,7 +633,8 @@ module atm_core
       use mpas_timer, only : mpas_timer_start, mpas_timer_stop
       use mpas_atm_boundaries, only : mpas_atm_update_bdy_tend
       use mpas_atm_diagnostics_manager, only : mpas_atm_diag_update, mpas_atm_diag_compute, mpas_atm_diag_reset
-   
+      use atm_time_integration, only : mpas_atm_dynamics_state_update_self
+
       implicit none
    
       type (domain_type), intent(inout) :: domain
@@ -842,6 +843,10 @@ module atm_core
          !
          call mpas_get_time(curr_time=currTime, dateTimeString=timeStamp, ierr=ierr)
          if (MPAS_stream_mgr_ringing_alarms(domain % streamManager, direction=MPAS_STREAM_OUTPUT, ierr=ierr)) then
+           ! Dynamics state now stays device-resident across timesteps (see
+           ! mpas_atm_dynamics_state_init); pull the host-visible subset back before
+           ! computing/writing output-stream fields that read it on the host.
+           call mpas_atm_dynamics_state_update_self(domain)
            block_ptr => domain % blocklist
            do while (associated(block_ptr))
               call mpas_pool_get_subpool(block_ptr % structs, 'state', state)

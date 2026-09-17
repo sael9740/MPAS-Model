@@ -817,6 +817,189 @@ module atm_time_integration
    end subroutine mpas_atm_dynamics_state_init
 
 
+   ! Companion to mpas_atm_dynamics_state_init: since dynamics state now stays device-resident
+   ! for the whole run instead of being copied out every timestep, this pulls the host-visible
+   ! subset of that field set back before an output-stream write, so history output is correct.
+   ! Skips the fields that mpas_atm_post_dynamics used to "exit data delete" rather than
+   ! "copyout" (scratch-only diag fields and all lbc fields) since those are never read on the host.
+   subroutine mpas_atm_dynamics_state_update_self(domain)
+
+      implicit none
+
+      type (domain_type), intent(inout) :: domain
+
+#ifdef MPAS_OPENACC
+      type (mpas_pool_type), pointer :: state
+      type (mpas_pool_type), pointer :: diag
+      type (mpas_pool_type), pointer :: tend
+      type (mpas_pool_type), pointer :: tend_physics
+
+      real (kind=RKIND), dimension(:,:), pointer :: ru, ru_p
+      real (kind=RKIND), dimension(:,:), pointer :: rw, rw_p
+      real (kind=RKIND), dimension(:,:), pointer :: rtheta_p
+      real (kind=RKIND), dimension(:,:), pointer :: exner, exner_base
+      real (kind=RKIND), dimension(:,:), pointer :: rtheta_base, rho_base
+      real (kind=RKIND), dimension(:,:), pointer :: rho_p, rho_pp, rho, theta, theta_base
+      real (kind=RKIND), dimension(:,:), pointer :: cqu, pressure_base, pressure_p, pressure, v
+      real (kind=RKIND), dimension(:,:), pointer :: kdiff, pv_edge, pv_vertex, rho_edge, h_divergence, ke
+      real (kind=RKIND), dimension(:,:), pointer :: rtheta_pp_old, rtheta_pp
+
+      real (kind=RKIND), dimension(:,:), pointer :: u_1, u_2
+      real (kind=RKIND), dimension(:,:), pointer :: w_1, w_2
+      real (kind=RKIND), dimension(:,:), pointer :: theta_m_1, theta_m_2
+      real (kind=RKIND), dimension(:,:), pointer :: rho_zz_1, rho_zz_2
+      real (kind=RKIND), dimension(:,:,:), pointer :: scalars_1, scalars_2
+      real (kind=RKIND), dimension(:,:), pointer :: ruAvg, wwAvg, ruAvg_split, wwAvg_split
+
+      real (kind=RKIND), dimension(:,:), pointer :: uReconstructZonal, uReconstructMeridional, uReconstructX, uReconstructY, uReconstructZ
+
+      real (kind=RKIND), dimension(:,:), pointer :: tend_ru, tend_rt, tend_rho, tend_rw, rt_diabatic_tend
+      real (kind=RKIND), dimension(:,:), pointer :: tend_u_euler, tend_w_euler, tend_theta_euler
+      real(kind=RKIND), dimension(:,:), pointer :: tend_w_pgf, tend_w_buoy
+      real(kind=RKIND), dimension(:,:,:), pointer :: scalar_tend_save
+
+      real (kind=RKIND), dimension(:,:), pointer :: rthdynten, divergence, vorticity
+
+      nullify(state)
+      nullify(diag)
+      nullify(tend)
+      nullify(tend_physics)
+      call mpas_pool_get_subpool(domain % blocklist % structs, 'state', state)
+      call mpas_pool_get_subpool(domain % blocklist % structs, 'diag', diag)
+      call mpas_pool_get_subpool(domain % blocklist % structs, 'tend', tend)
+      call mpas_pool_get_subpool(domain % blocklist % structs, 'tend_physics', tend_physics)
+
+      MPAS_ACC_TIMER_START('mpas_atm_dynamics_state_update_self [ACC_data_xfer]')
+      call mpas_pool_get_array(diag, 'ru', ru)
+      !$acc update self(ru)
+      call mpas_pool_get_array(diag, 'ru_p', ru_p)
+      !$acc update self(ru_p)
+      call mpas_pool_get_array(diag, 'rw', rw)
+      !$acc update self(rw)
+      call mpas_pool_get_array(diag, 'rw_p', rw_p)
+      !$acc update self(rw_p)
+      call mpas_pool_get_array(diag, 'rtheta_p', rtheta_p)
+      !$acc update self(rtheta_p)
+      call mpas_pool_get_array(diag, 'exner', exner)
+      !$acc update self(exner)
+      call mpas_pool_get_array(diag, 'exner_base', exner_base)
+      !$acc update self(exner_base)
+      call mpas_pool_get_array(diag, 'rtheta_base', rtheta_base)
+      !$acc update self(rtheta_base)
+      call mpas_pool_get_array(diag, 'rho_base', rho_base)
+      !$acc update self(rho_base)
+      call mpas_pool_get_array(diag, 'rho', rho)
+      !$acc update self(rho)
+      call mpas_pool_get_array(diag, 'theta', theta)
+      !$acc update self(theta)
+      call mpas_pool_get_array(diag, 'theta_base', theta_base)
+      !$acc update self(theta_base)
+      call mpas_pool_get_array(diag, 'rho_p', rho_p)
+      !$acc update self(rho_p)
+      call mpas_pool_get_array(diag, 'rho_pp', rho_pp)
+      !$acc update self(rho_pp)
+      call mpas_pool_get_array(diag, 'cqu', cqu)
+      !$acc update self(cqu)
+      call mpas_pool_get_array(diag, 'pressure_p', pressure_p)
+      !$acc update self(pressure_p)
+      call mpas_pool_get_array(diag, 'pressure_base', pressure_base)
+      !$acc update self(pressure_base)
+      call mpas_pool_get_array(diag, 'pressure', pressure)
+      !$acc update self(pressure)
+      call mpas_pool_get_array(diag, 'v', v)
+      !$acc update self(v)
+      call mpas_pool_get_array(diag, 'rtheta_pp', rtheta_pp)
+      !$acc update self(rtheta_pp)
+      call mpas_pool_get_array(diag, 'rtheta_pp_old', rtheta_pp_old)
+      !$acc update self(rtheta_pp_old)
+      call mpas_pool_get_array(diag, 'kdiff', kdiff)
+      !$acc update self(kdiff)
+      call mpas_pool_get_array(diag, 'pv_edge', pv_edge)
+      !$acc update self(pv_edge)
+      call mpas_pool_get_array(diag, 'pv_vertex', pv_vertex)
+      !$acc update self(pv_vertex)
+      call mpas_pool_get_array(diag, 'rho_edge', rho_edge)
+      !$acc update self(rho_edge)
+      call mpas_pool_get_array(diag, 'h_divergence', h_divergence)
+      !$acc update self(h_divergence)
+      call mpas_pool_get_array(diag, 'ke', ke)
+      !$acc update self(ke)
+      call mpas_pool_get_array(diag, 'vorticity', vorticity)
+      !$acc update self(vorticity)
+      call mpas_pool_get_array(diag, 'divergence', divergence)
+      !$acc update self(divergence)
+      call mpas_pool_get_array(diag, 'ruAvg', ruAvg)
+      !$acc update self(ruAvg)
+      call mpas_pool_get_array(diag, 'ruAvg_split', ruAvg_split)
+      !$acc update self(ruAvg_split)
+      call mpas_pool_get_array(diag, 'wwAvg', wwAvg)
+      !$acc update self(wwAvg)
+      call mpas_pool_get_array(diag, 'wwAvg_split', wwAvg_split)
+      !$acc update self(wwAvg_split)
+      call mpas_pool_get_array(diag, 'uReconstructX', uReconstructX)
+      !$acc update self(uReconstructX)
+      call mpas_pool_get_array(diag, 'uReconstructY', uReconstructY)
+      !$acc update self(uReconstructY)
+      call mpas_pool_get_array(diag, 'uReconstructZ', uReconstructZ)
+      !$acc update self(uReconstructZ)
+      call mpas_pool_get_array(diag, 'uReconstructZonal', uReconstructZonal)
+      !$acc update self(uReconstructZonal)
+      call mpas_pool_get_array(diag, 'uReconstructMeridional', uReconstructMeridional)
+      !$acc update self(uReconstructMeridional)
+
+      call mpas_pool_get_array(state, 'u', u_1, 1)
+      !$acc update self(u_1)
+      call mpas_pool_get_array(state, 'u', u_2, 2)
+      !$acc update self(u_2)
+      call mpas_pool_get_array(state, 'w', w_1, 1)
+      !$acc update self(w_1)
+      call mpas_pool_get_array(state, 'w', w_2, 2)
+      !$acc update self(w_2)
+      call mpas_pool_get_array(state, 'theta_m', theta_m_1, 1)
+      !$acc update self(theta_m_1)
+      call mpas_pool_get_array(state, 'theta_m', theta_m_2, 2)
+      !$acc update self(theta_m_2)
+      call mpas_pool_get_array(state, 'rho_zz', rho_zz_1, 1)
+      !$acc update self(rho_zz_1)
+      call mpas_pool_get_array(state, 'rho_zz', rho_zz_2, 2)
+      !$acc update self(rho_zz_2)
+      call mpas_pool_get_array(state, 'scalars', scalars_1, 1)
+      !$acc update self(scalars_1)
+      call mpas_pool_get_array(state, 'scalars', scalars_2, 2)
+      !$acc update self(scalars_2)
+
+      call mpas_pool_get_array(tend, 'u', tend_ru)
+      !$acc update self(tend_ru)
+      call mpas_pool_get_array(tend, 'rho_zz', tend_rho)
+      !$acc update self(tend_rho)
+      call mpas_pool_get_array(tend, 'theta_m', tend_rt)
+      !$acc update self(tend_rt)
+      call mpas_pool_get_array(tend, 'w', tend_rw)
+      !$acc update self(tend_rw)
+      call mpas_pool_get_array(tend, 'rt_diabatic_tend', rt_diabatic_tend)
+      !$acc update self(rt_diabatic_tend)
+      call mpas_pool_get_array(tend, 'u_euler', tend_u_euler)
+      !$acc update self(tend_u_euler)
+      call mpas_pool_get_array(tend, 'theta_euler', tend_theta_euler)
+      !$acc update self(tend_theta_euler)
+      call mpas_pool_get_array(tend, 'w_euler', tend_w_euler)
+      !$acc update self(tend_w_euler)
+      call mpas_pool_get_array(tend, 'w_pgf', tend_w_pgf)
+      !$acc update self(tend_w_pgf)
+      call mpas_pool_get_array(tend, 'w_buoy', tend_w_buoy)
+      !$acc update self(tend_w_buoy)
+      call mpas_pool_get_array(tend, 'scalars_tend', scalar_tend_save)
+      !$acc update self(scalar_tend_save)
+
+      call mpas_pool_get_array(tend_physics, 'rthdynten', rthdynten)
+      !$acc update self(rthdynten)
+
+      MPAS_ACC_TIMER_STOP('mpas_atm_dynamics_state_update_self [ACC_data_xfer]')
+#endif
+
+   end subroutine mpas_atm_dynamics_state_update_self
+
+
    subroutine mpas_atm_pre_compute_solve_diagnostics(block)
 
       implicit none
@@ -1194,283 +1377,10 @@ module atm_time_integration
 
       type (domain_type), intent(inout) :: domain
 
-
-#ifdef MPAS_OPENACC
-      type (mpas_pool_type), pointer :: mesh
-      type (mpas_pool_type), pointer :: state
-      type (mpas_pool_type), pointer :: diag
-      type (mpas_pool_type), pointer :: tend
-      type (mpas_pool_type), pointer :: tend_physics
-      type (mpas_pool_type), pointer :: lbc
-
-      logical, pointer :: config_apply_lbcs_ptr
-      logical :: config_apply_lbcs
-
-      real (kind=RKIND), dimension(:,:), pointer :: ru, ru_p
-      real (kind=RKIND), dimension(:,:), pointer :: ru_save
-      real (kind=RKIND), dimension(:,:), pointer :: rw, rw_p
-      real (kind=RKIND), dimension(:,:), pointer :: rw_save
-      real (kind=RKIND), dimension(:,:), pointer :: rtheta_p
-      real (kind=RKIND), dimension(:,:), pointer :: exner, exner_base
-      real (kind=RKIND), dimension(:,:), pointer :: rtheta_base, rho_base
-      real (kind=RKIND), dimension(:,:), pointer :: rtheta_p_save
-      real (kind=RKIND), dimension(:,:), pointer :: rho_p, rho_pp, rho, theta, theta_base
-      real (kind=RKIND), dimension(:,:), pointer :: rho_p_save
-      real (kind=RKIND), dimension(:,:), pointer :: rho_zz_old_split
-      real (kind=RKIND), dimension(:,:), pointer :: cqw, rtheta_pp_old, rtheta_pp
-      real (kind=RKIND), dimension(:,:), pointer :: cqu, pressure_base, pressure_p, pressure, v
-      real (kind=RKIND), dimension(:,:), pointer :: kdiff, pv_edge, pv_vertex, pv_cell, rho_edge, h_divergence, ke
-      real (kind=RKIND), dimension(:,:), pointer :: cofwr, cofwz, coftz, cofwt, a_tri, alpha_tri, gamma_tri
-      real (kind=RKIND), dimension(:), pointer :: cofrz
-      real (kind=RKIND), dimension(:,:), pointer :: gradPVn, gradPVt
-
-
-      real (kind=RKIND), dimension(:,:), pointer :: u_1, u_2
-      real (kind=RKIND), dimension(:,:), pointer :: w_1, w_2
-      real (kind=RKIND), dimension(:,:), pointer :: theta_m_1, theta_m_2
-      real (kind=RKIND), dimension(:,:), pointer :: rho_zz_1, rho_zz_2
-      real (kind=RKIND), dimension(:,:,:), pointer :: scalars_1, scalars_2
-      real (kind=RKIND), dimension(:,:), pointer :: ruAvg, wwAvg, ruAvg_split, wwAvg_split
-
-      integer, pointer :: nCells_ptr
-      integer :: nCells
-      real (kind=RKIND), dimension(:,:), pointer :: uReconstructZonal, uReconstructMeridional, uReconstructX, uReconstructY, uReconstructZ
-
-      real (kind=RKIND), dimension(:,:), pointer :: tend_ru, tend_rt, tend_rho, tend_rw, rt_diabatic_tend
-      real (kind=RKIND), dimension(:,:), pointer :: tend_u_euler, tend_w_euler, tend_theta_euler
-      real(kind=RKIND), dimension(:,:), pointer :: tend_w_pgf, tend_w_buoy
-      real(kind=RKIND), dimension(:,:,:), pointer :: scalar_tend_save
-
-      real (kind=RKIND), dimension(:,:), pointer :: rthdynten, divergence, vorticity
-
-      real (kind=RKIND), dimension(:,:), pointer :: lbc_u, lbc_w, lbc_ru, lbc_rho_edge, lbc_rho, lbc_rtheta_m, lbc_rho_zz, lbc_theta
-      real (kind=RKIND), dimension(:,:), pointer :: lbc_tend_u, lbc_tend_w, lbc_tend_ru, lbc_tend_rho_edge, lbc_tend_rho
-      real (kind=RKIND), dimension(:,:), pointer :: lbc_tend_rtheta_m, lbc_tend_rho_zz, lbc_tend_theta
-
-      real (kind=RKIND), dimension(:,:,:), pointer :: lbc_scalars, lbc_tend_scalars
-
-      nullify(mesh)
-      nullify(state)
-      nullify(diag)
-      nullify(tend)
-      nullify(tend_physics)
-      nullify(lbc)
-      call mpas_pool_get_subpool(domain % blocklist % structs, 'mesh', mesh)
-      call mpas_pool_get_subpool(domain % blocklist % structs, 'state', state)
-      call mpas_pool_get_subpool(domain % blocklist % structs, 'diag', diag)
-      call mpas_pool_get_subpool(domain % blocklist % structs, 'tend', tend)
-      call mpas_pool_get_subpool(domain % blocklist % structs, 'tend_physics', tend_physics)
-      call mpas_pool_get_subpool(domain % blocklist % structs, 'lbc', lbc)
-
-      call mpas_pool_get_config(domain % blocklist % configs, 'config_apply_lbcs', config_apply_lbcs_ptr)
-      config_apply_lbcs = config_apply_lbcs_ptr
-
-      MPAS_ACC_TIMER_START('atm_srk3 [ACC_data_xfer]')
-      call mpas_pool_get_array(diag, 'ru', ru)
-      !$acc enter data copyin(ru) ! use values from atm_init_coupled_diagnostics
-      call mpas_pool_get_array(diag, 'ru_p', ru_p)
-      !$acc enter data copyin(ru_p)
-      call mpas_pool_get_array(diag, 'ru_save', ru_save)
-      !$acc enter data copyin(ru_save)
-      call mpas_pool_get_array(diag, 'rw', rw)
-      !$acc enter data copyin(rw) ! use values from atm_init_coupled_diagnostics
-      call mpas_pool_get_array(diag, 'rw_p', rw_p)
-      !$acc enter data copyin(rw_p)
-      call mpas_pool_get_array(diag, 'rw_save', rw_save)
-      !$acc enter data copyin(rw_save)
-      call mpas_pool_get_array(diag, 'rtheta_p', rtheta_p)
-      !$acc enter data copyin(rtheta_p) ! use values from atm_init_coupled_diagnostics
-      call mpas_pool_get_array(diag, 'rtheta_p_save', rtheta_p_save)
-      !$acc enter data copyin(rtheta_p_save)
-      call mpas_pool_get_array(diag, 'exner', exner)
-      !$acc enter data copyin(exner) ! use values from atm_init_coupled_diagnostics
-      call mpas_pool_get_array(diag, 'exner_base', exner_base)
-      !$acc enter data copyin(exner_base) ! use values from atm_init_coupled_diagnostics
-      call mpas_pool_get_array(diag, 'rtheta_base', rtheta_base)
-      !$acc enter data copyin(rtheta_base) ! use values from atm_init_coupled_diagnostics
-      call mpas_pool_get_array(diag, 'rho_base', rho_base)
-      !$acc enter data copyin(rho_base)
-      call mpas_pool_get_array(diag, 'rho', rho)
-      !$acc enter data copyin(rho)
-      call mpas_pool_get_array(diag, 'theta', theta)
-      !$acc enter data copyin(theta)
-      call mpas_pool_get_array(diag, 'theta_base', theta_base)
-      !$acc enter data copyin(theta_base)
-      call mpas_pool_get_array(diag, 'rho_p', rho_p)
-      !$acc enter data copyin(rho_p) ! use values from atm_init_coupled_diagnostics
-      call mpas_pool_get_array(diag, 'rho_p_save', rho_p_save)
-      !$acc enter data copyin(rho_p_save)
-      call mpas_pool_get_array(diag, 'rho_pp', rho_pp)
-      !$acc enter data copyin(rho_pp)
-      call mpas_pool_get_array(diag, 'rho_zz_old_split', rho_zz_old_split)
-      !$acc enter data copyin(rho_zz_old_split)
-      call mpas_pool_get_array(diag, 'cqw', cqw)
-      !$acc enter data copyin(cqw)
-      call mpas_pool_get_array(diag, 'cqu', cqu)
-      !$acc enter data copyin(cqu)
-      call mpas_pool_get_array(diag, 'pressure_p', pressure_p)
-      !$acc enter data copyin(pressure_p) ! use values from atm_init_coupled_diagnostics
-      call mpas_pool_get_array(diag, 'pressure_base', pressure_base)
-      !$acc enter data copyin(pressure_base) ! use values from atm_init_coupled_diagnostics
-      call mpas_pool_get_array(diag, 'pressure', pressure)
-      !$acc enter data copyin(pressure)
-      call mpas_pool_get_array(diag, 'v', v)
-      !$acc enter data copyin(v) ! use values from atm_compute_solve_diagnostics
-      call mpas_pool_get_array(diag, 'rtheta_pp', rtheta_pp)
-      !$acc enter data copyin(rtheta_pp)
-      call mpas_pool_get_array(diag, 'rtheta_pp_old', rtheta_pp_old)
-      !$acc enter data copyin(rtheta_pp_old)
-      call mpas_pool_get_array(diag, 'kdiff', kdiff)
-      !$acc enter data copyin(kdiff)
-      call mpas_pool_get_array(diag, 'pv_edge', pv_edge)
-      !$acc enter data copyin(pv_edge) ! use values from atm_compute_solve_diagnostics
-      call mpas_pool_get_array(diag, 'pv_vertex', pv_vertex)
-      !$acc enter data copyin(pv_vertex)
-      call mpas_pool_get_array(diag, 'pv_cell', pv_cell)
-      !$acc enter data copyin(pv_cell)
-      call mpas_pool_get_array(diag, 'rho_edge', rho_edge)
-      !$acc enter data copyin(rho_edge) ! use values from atm_compute_solve_diagnostics
-      call mpas_pool_get_array(diag, 'h_divergence', h_divergence)
-      !$acc enter data copyin(h_divergence)
-      call mpas_pool_get_array(diag, 'ke', ke)
-      !$acc enter data copyin(ke) ! use values from atm_compute_solve_diagnostics
-      call mpas_pool_get_array(diag, 'gradPVn', gradPVn)
-      !$acc enter data copyin(gradPVn)
-      call mpas_pool_get_array(diag, 'gradPVt', gradPVt)
-      !$acc enter data copyin(gradPVt)
-
-      call mpas_pool_get_array(diag, 'alpha_tri', alpha_tri)
-      !$acc enter data copyin(alpha_tri)
-      call mpas_pool_get_array(diag, 'gamma_tri', gamma_tri)
-      !$acc enter data copyin(gamma_tri)
-      call mpas_pool_get_array(diag, 'a_tri', a_tri)
-      !$acc enter data copyin(a_tri)
-      call mpas_pool_get_array(diag, 'cofwr', cofwr)
-      !$acc enter data copyin(cofwr)
-      call mpas_pool_get_array(diag, 'cofwz', cofwz)
-      !$acc enter data copyin(cofwz)
-      call mpas_pool_get_array(diag, 'coftz', coftz)
-      !$acc enter data copyin(coftz)
-      call mpas_pool_get_array(diag, 'cofwt', cofwt)
-      !$acc enter data copyin(cofwt)
-      call mpas_pool_get_array(diag, 'cofrz', cofrz)
-      !$acc enter data copyin(cofrz)
-      call mpas_pool_get_array(diag, 'vorticity', vorticity)
-      !$acc enter data copyin(vorticity)
-      call mpas_pool_get_array(diag, 'divergence', divergence)
-      !$acc enter data copyin(divergence)
-      call mpas_pool_get_array(diag, 'ruAvg', ruAvg)
-      !$acc enter data copyin(ruAvg)
-      call mpas_pool_get_array(diag, 'ruAvg_split', ruAvg_split)
-      !$acc enter data copyin(ruAvg_split)
-      call mpas_pool_get_array(diag, 'wwAvg', wwAvg)
-      !$acc enter data copyin(wwAvg)
-      call mpas_pool_get_array(diag, 'wwAvg_split', wwAvg_split)
-      !$acc enter data copyin(wwAvg_split)
-
-      call mpas_pool_get_dimension(mesh, 'nCellsSolve', nCells_ptr)
-      nCells = nCells_ptr
-      call mpas_pool_get_array(diag, 'uReconstructX', uReconstructX)
-      !$acc enter data create(uReconstructX)
-      call mpas_pool_get_array(diag, 'uReconstructY', uReconstructY)
-      !$acc enter data create(uReconstructY)
-      call mpas_pool_get_array(diag, 'uReconstructZ', uReconstructZ)
-      !$acc enter data create(uReconstructZ)
-      call mpas_pool_get_array(diag, 'uReconstructZonal', uReconstructZonal)
-      !$acc enter data copyin(uReconstructZonal)
-      call mpas_pool_get_array(diag, 'uReconstructMeridional', uReconstructMeridional)
-      !$acc enter data copyin(uReconstructMeridional)
-
-      call mpas_pool_get_array(state, 'u', u_1, 1)
-      !$acc enter data copyin(u_1)
-      call mpas_pool_get_array(state, 'u', u_2, 2)
-      !$acc enter data copyin(u_2)
-      call mpas_pool_get_array(state, 'w', w_1, 1)
-      !$acc enter data copyin(w_1)
-      call mpas_pool_get_array(state, 'w', w_2, 2)
-      !$acc enter data copyin(w_2)
-      call mpas_pool_get_array(state, 'theta_m', theta_m_1, 1)
-      !$acc enter data copyin(theta_m_1)   ! use values from atm_init_coupled_diagnostics
-      call mpas_pool_get_array(state, 'theta_m', theta_m_2, 2)
-      !$acc enter data copyin(theta_m_2)
-      call mpas_pool_get_array(state, 'rho_zz', rho_zz_1, 1)
-      !$acc enter data copyin(rho_zz_1)
-      call mpas_pool_get_array(state, 'rho_zz', rho_zz_2, 2)
-      !$acc enter data copyin(rho_zz_2)
-      call mpas_pool_get_array(state, 'scalars', scalars_1, 1)
-      !$acc enter data copyin(scalars_1)
-      call mpas_pool_get_array(state, 'scalars', scalars_2, 2)
-      !$acc enter data copyin(scalars_2)
-
-      call mpas_pool_get_array(tend, 'u', tend_ru)
-      !$acc enter data copyin(tend_ru)
-      call mpas_pool_get_array(tend, 'rho_zz', tend_rho)
-      !$acc enter data copyin(tend_rho)
-      call mpas_pool_get_array(tend, 'theta_m', tend_rt)
-      !$acc enter data copyin(tend_rt)
-      call mpas_pool_get_array(tend, 'w', tend_rw)
-      !$acc enter data copyin(tend_rw)
-      call mpas_pool_get_array(tend, 'rt_diabatic_tend', rt_diabatic_tend)
-      !$acc enter data copyin(rt_diabatic_tend)
-      call mpas_pool_get_array(tend, 'u_euler', tend_u_euler)
-      !$acc enter data copyin(tend_u_euler)
-      call mpas_pool_get_array(tend, 'theta_euler', tend_theta_euler)
-      !$acc enter data copyin(tend_theta_euler)
-      call mpas_pool_get_array(tend, 'w_euler', tend_w_euler)
-      !$acc enter data copyin(tend_w_euler)
-      call mpas_pool_get_array(tend, 'w_pgf', tend_w_pgf)
-      !$acc enter data copyin(tend_w_pgf)
-      call mpas_pool_get_array(tend, 'w_buoy', tend_w_buoy)
-      !$acc enter data copyin(tend_w_buoy)
-      call mpas_pool_get_array(tend, 'scalars_tend', scalar_tend_save)
-      !$acc enter data copyin(scalar_tend_save)
-
-
-      if(config_apply_lbcs) then
-         call mpas_pool_get_array(lbc, 'lbc_u', lbc_u, 2)
-         !$acc enter data copyin(lbc_u)
-         call mpas_pool_get_array(lbc, 'lbc_w', lbc_w, 2)
-         !$acc enter data copyin(lbc_w)
-         call mpas_pool_get_array(lbc, 'lbc_ru', lbc_ru, 2)
-         !$acc enter data copyin(lbc_ru)
-         call mpas_pool_get_array(lbc, 'lbc_rho_edge', lbc_rho_edge, 2)
-         !$acc enter data copyin(lbc_rho_edge)
-         call mpas_pool_get_array(lbc, 'lbc_theta', lbc_theta, 2)
-         !$acc enter data copyin(lbc_theta)
-         call mpas_pool_get_array(lbc, 'lbc_rtheta_m', lbc_rtheta_m, 2)
-         !$acc enter data copyin(lbc_rtheta_m)
-         call mpas_pool_get_array(lbc, 'lbc_rho_zz', lbc_rho_zz, 2)
-         !$acc enter data copyin(lbc_rho_zz)
-         call mpas_pool_get_array(lbc, 'lbc_rho', lbc_rho, 2)
-         !$acc enter data copyin(lbc_rho)
-         call mpas_pool_get_array(lbc, 'lbc_scalars', lbc_scalars, 2)
-         !$acc enter data copyin(lbc_scalars)
-
-         call mpas_pool_get_array(lbc, 'lbc_u', lbc_tend_u, 1)
-         !$acc enter data copyin(lbc_tend_u)
-         call mpas_pool_get_array(lbc, 'lbc_ru', lbc_tend_ru, 1)
-         !$acc enter data copyin(lbc_tend_ru)
-         call mpas_pool_get_array(lbc, 'lbc_rho_edge', lbc_tend_rho_edge, 1)
-         !$acc enter data copyin(lbc_tend_rho_edge)
-         call mpas_pool_get_array(lbc, 'lbc_w', lbc_tend_w, 1)
-         !$acc enter data copyin(lbc_tend_w)
-         call mpas_pool_get_array(lbc, 'lbc_theta', lbc_tend_theta, 1)
-         !$acc enter data copyin(lbc_tend_theta)
-         call mpas_pool_get_array(lbc, 'lbc_rtheta_m', lbc_tend_rtheta_m, 1)
-         !$acc enter data copyin(lbc_tend_rtheta_m)
-         call mpas_pool_get_array(lbc, 'lbc_rho_zz', lbc_tend_rho_zz, 1)
-         !$acc enter data copyin(lbc_tend_rho_zz)
-         call mpas_pool_get_array(lbc, 'lbc_rho', lbc_tend_rho, 1)
-         !$acc enter data copyin(lbc_tend_rho)
-         call mpas_pool_get_array(lbc, 'lbc_scalars', lbc_tend_scalars, 1)
-         !$acc enter data copyin(lbc_tend_scalars)
-      end if
-
-      call mpas_pool_get_array(tend_physics, 'rthdynten', rthdynten)
-      !$acc enter data copyin(rthdynten)
-
-      MPAS_ACC_TIMER_STOP('atm_srk3 [ACC_data_xfer]')
-#endif
+      ! Dynamics state is now staged onto the device once, in mpas_atm_dynamics_state_init,
+      ! rather than every timestep here (see that routine's comment for rationale). This
+      ! is intentionally left as a no-op call site rather than removed, to keep this change
+      ! minimal and to preserve the atm_timestep call structure.
 
    end subroutine mpas_atm_pre_dynamics
 
@@ -1481,280 +1391,11 @@ module atm_time_integration
 
       type (domain_type), intent(inout) :: domain
 
-
-#ifdef MPAS_OPENACC
-      type (mpas_pool_type), pointer :: mesh
-      type (mpas_pool_type), pointer :: state
-      type (mpas_pool_type), pointer :: diag
-      type (mpas_pool_type), pointer :: tend
-      type (mpas_pool_type), pointer :: tend_physics
-      type (mpas_pool_type), pointer :: lbc
-
-      logical, pointer :: config_apply_lbcs_ptr
-      logical :: config_apply_lbcs
-
-      real (kind=RKIND), dimension(:,:), pointer :: ru, ru_p
-      real (kind=RKIND), dimension(:,:), pointer :: ru_save
-      real (kind=RKIND), dimension(:,:), pointer :: rw, rw_p
-      real (kind=RKIND), dimension(:,:), pointer :: rw_save
-      real (kind=RKIND), dimension(:,:), pointer :: rtheta_p
-      real (kind=RKIND), dimension(:,:), pointer :: exner, exner_base
-      real (kind=RKIND), dimension(:,:), pointer :: rtheta_base, rho_base
-      real (kind=RKIND), dimension(:,:), pointer :: rtheta_p_save
-      real (kind=RKIND), dimension(:,:), pointer :: rho_p, rho_pp, rho, theta, theta_base
-      real (kind=RKIND), dimension(:,:), pointer :: rho_p_save
-      real (kind=RKIND), dimension(:,:), pointer :: rho_zz_old_split
-      real (kind=RKIND), dimension(:,:), pointer :: cqw, rtheta_pp_old, rtheta_pp
-      real (kind=RKIND), dimension(:,:), pointer :: cqu, pressure_base, pressure_p, pressure, v
-      real (kind=RKIND), dimension(:,:), pointer :: kdiff, pv_edge, pv_vertex, pv_cell, rho_edge, h_divergence, ke
-      real (kind=RKIND), dimension(:,:), pointer :: cofwr, cofwz, coftz, cofwt, a_tri, alpha_tri, gamma_tri
-      real (kind=RKIND), dimension(:), pointer :: cofrz
-      real (kind=RKIND), dimension(:,:), pointer :: gradPVn, gradPVt
-
-      real (kind=RKIND), dimension(:,:), pointer :: u_1, u_2
-      real (kind=RKIND), dimension(:,:), pointer :: w_1, w_2
-      real (kind=RKIND), dimension(:,:), pointer :: theta_m_1, theta_m_2
-      real (kind=RKIND), dimension(:,:), pointer :: rho_zz_1, rho_zz_2
-      real (kind=RKIND), dimension(:,:,:), pointer :: scalars_1, scalars_2
-      real (kind=RKIND), dimension(:,:), pointer :: ruAvg, wwAvg, ruAvg_split, wwAvg_split
-
-      integer, pointer :: nCells_ptr
-      integer :: nCells
-      real (kind=RKIND), dimension(:,:), pointer :: uReconstructZonal, uReconstructMeridional, uReconstructX, uReconstructY, uReconstructZ
-
-      real (kind=RKIND), dimension(:,:), pointer :: tend_ru, tend_rt, tend_rho, tend_rw, rt_diabatic_tend
-      real (kind=RKIND), dimension(:,:), pointer :: tend_u_euler, tend_w_euler, tend_theta_euler
-      real(kind=RKIND), dimension(:,:), pointer :: tend_w_pgf, tend_w_buoy
-      real(kind=RKIND), dimension(:,:,:), pointer :: scalar_tend_save
-
-      real (kind=RKIND), dimension(:,:), pointer :: rthdynten, divergence, vorticity
-
-      real (kind=RKIND), dimension(:,:), pointer :: lbc_u, lbc_w, lbc_ru, lbc_rho_edge, lbc_rho, lbc_rtheta_m, lbc_rho_zz, lbc_theta
-      real (kind=RKIND), dimension(:,:), pointer :: lbc_tend_u, lbc_tend_w, lbc_tend_ru, lbc_tend_rho_edge, lbc_tend_rho
-      real (kind=RKIND), dimension(:,:), pointer :: lbc_tend_rtheta_m, lbc_tend_rho_zz, lbc_tend_theta
-
-      real (kind=RKIND), dimension(:,:,:), pointer :: lbc_scalars, lbc_tend_scalars
-
-      nullify(mesh)
-      nullify(state)
-      nullify(diag)
-      nullify(tend)
-      nullify(tend_physics)
-      nullify(lbc)
-      call mpas_pool_get_subpool(domain % blocklist % structs, 'mesh', mesh)
-      call mpas_pool_get_subpool(domain % blocklist % structs, 'state', state)
-      call mpas_pool_get_subpool(domain % blocklist % structs, 'diag', diag)
-      call mpas_pool_get_subpool(domain % blocklist % structs, 'tend', tend)
-      call mpas_pool_get_subpool(domain % blocklist % structs, 'tend_physics', tend_physics)
-      call mpas_pool_get_subpool(domain % blocklist % structs, 'lbc', lbc)
-
-      call mpas_pool_get_config(domain % blocklist % configs, 'config_apply_lbcs', config_apply_lbcs_ptr)
-      config_apply_lbcs = config_apply_lbcs_ptr
-
-      MPAS_ACC_TIMER_START('atm_srk3 [ACC_data_xfer]')
-      call mpas_pool_get_array(diag, 'ru', ru)
-      !$acc exit data copyout(ru) ! use values from atm_init_coupled_diagnostics
-      call mpas_pool_get_array(diag, 'ru_p', ru_p)
-      !$acc exit data copyout(ru_p)
-      call mpas_pool_get_array(diag, 'ru_save', ru_save)
-      !$acc exit data delete(ru_save)
-      call mpas_pool_get_array(diag, 'rw', rw)
-      !$acc exit data copyout(rw) ! use values from atm_init_coupled_diagnostics
-      call mpas_pool_get_array(diag, 'rw_p', rw_p)
-      !$acc exit data copyout(rw_p)
-      call mpas_pool_get_array(diag, 'rw_save', rw_save)
-      !$acc exit data delete(rw_save)
-      call mpas_pool_get_array(diag, 'rtheta_p', rtheta_p)
-      !$acc exit data copyout(rtheta_p) ! use values from atm_init_coupled_diagnostics
-      call mpas_pool_get_array(diag, 'rtheta_p_save', rtheta_p_save)
-      !$acc exit data delete(rtheta_p_save)
-      call mpas_pool_get_array(diag, 'exner', exner)
-      !$acc exit data copyout(exner) ! use values from atm_init_coupled_diagnostics
-      call mpas_pool_get_array(diag, 'exner_base', exner_base)
-      !$acc exit data copyout(exner_base) ! use values from atm_init_coupled_diagnostics
-      call mpas_pool_get_array(diag, 'rtheta_base', rtheta_base)
-      !$acc exit data copyout(rtheta_base) ! use values from atm_init_coupled_diagnostics
-      call mpas_pool_get_array(diag, 'rho_base', rho_base)
-      !$acc exit data copyout(rho_base)
-      call mpas_pool_get_array(diag, 'rho', rho)
-      !$acc exit data copyout(rho)
-      call mpas_pool_get_array(diag, 'theta', theta)
-      !$acc exit data copyout(theta)
-      call mpas_pool_get_array(diag, 'theta_base', theta_base)
-      !$acc exit data copyout(theta_base)
-      call mpas_pool_get_array(diag, 'rho_p', rho_p)
-      !$acc exit data copyout(rho_p) ! use values from atm_init_coupled_diagnostics
-      call mpas_pool_get_array(diag, 'rho_p_save', rho_p_save)
-      !$acc exit data delete(rho_p_save)
-      call mpas_pool_get_array(diag, 'rho_pp', rho_pp)
-      !$acc exit data copyout(rho_pp)
-      call mpas_pool_get_array(diag, 'rho_zz_old_split', rho_zz_old_split)
-      !$acc exit data delete(rho_zz_old_split)
-      call mpas_pool_get_array(diag, 'cqw', cqw)
-      !$acc exit data delete(cqw)
-      call mpas_pool_get_array(diag, 'cqu', cqu)
-      !$acc exit data copyout(cqu)
-      call mpas_pool_get_array(diag, 'pressure_p', pressure_p)
-      !$acc exit data copyout(pressure_p) ! use values from atm_init_coupled_diagnostics
-      call mpas_pool_get_array(diag, 'pressure_base', pressure_base)
-      !$acc exit data copyout(pressure_base) ! use values from atm_init_coupled_diagnostics
-      call mpas_pool_get_array(diag, 'pressure', pressure)
-      !$acc exit data copyout(pressure)
-      call mpas_pool_get_array(diag, 'v', v)
-      !$acc exit data copyout(v) ! use values from atm_compute_solve_diagnostics
-      call mpas_pool_get_array(diag, 'rtheta_pp', rtheta_pp)
-      !$acc exit data copyout(rtheta_pp)
-      call mpas_pool_get_array(diag, 'rtheta_pp_old', rtheta_pp_old)
-      !$acc exit data copyout(rtheta_pp_old)
-      call mpas_pool_get_array(diag, 'kdiff', kdiff)
-      !$acc exit data copyout(kdiff)
-      call mpas_pool_get_array(diag, 'pv_edge', pv_edge)
-      !$acc exit data copyout(pv_edge) ! use values from atm_compute_solve_diagnostics
-      call mpas_pool_get_array(diag, 'pv_vertex', pv_vertex)
-      !$acc exit data copyout(pv_vertex)
-      call mpas_pool_get_array(diag, 'pv_cell', pv_cell)
-      !$acc exit data delete(pv_cell)
-      call mpas_pool_get_array(diag, 'rho_edge', rho_edge)
-      !$acc exit data copyout(rho_edge) ! use values from atm_compute_solve_diagnostics
-      call mpas_pool_get_array(diag, 'h_divergence', h_divergence)
-      !$acc exit data copyout(h_divergence)
-      call mpas_pool_get_array(diag, 'ke', ke)
-      !$acc exit data copyout(ke) ! use values from atm_compute_solve_diagnostics
-      call mpas_pool_get_array(diag, 'gradPVn', gradPVn)
-      !$acc exit data delete(gradPVn)
-      call mpas_pool_get_array(diag, 'gradPVt', gradPVt)
-      !$acc exit data delete(gradPVt)
-
-      call mpas_pool_get_array(diag, 'alpha_tri', alpha_tri)
-      !$acc exit data delete(alpha_tri)
-      call mpas_pool_get_array(diag, 'gamma_tri', gamma_tri)
-      !$acc exit data delete(gamma_tri)
-      call mpas_pool_get_array(diag, 'a_tri', a_tri)
-      !$acc exit data delete(a_tri)
-      call mpas_pool_get_array(diag, 'cofwr', cofwr)
-      !$acc exit data delete(cofwr)
-      call mpas_pool_get_array(diag, 'cofwz', cofwz)
-      !$acc exit data delete(cofwz)
-      call mpas_pool_get_array(diag, 'coftz', coftz)
-      !$acc exit data delete(coftz)
-      call mpas_pool_get_array(diag, 'cofwt', cofwt)
-      !$acc exit data delete(cofwt)
-      call mpas_pool_get_array(diag, 'cofrz', cofrz)
-      !$acc exit data delete(cofrz)
-      call mpas_pool_get_array(diag, 'vorticity', vorticity)
-      !$acc exit data copyout(vorticity)
-      call mpas_pool_get_array(diag, 'divergence', divergence)
-      !$acc exit data copyout(divergence)
-      call mpas_pool_get_array(diag, 'ruAvg', ruAvg)
-      !$acc exit data copyout(ruAvg)
-      call mpas_pool_get_array(diag, 'ruAvg_split', ruAvg_split)
-      !$acc exit data copyout(ruAvg_split)
-      call mpas_pool_get_array(diag, 'wwAvg', wwAvg)
-      !$acc exit data copyout(wwAvg)
-      call mpas_pool_get_array(diag, 'wwAvg_split', wwAvg_split)
-      !$acc exit data copyout(wwAvg_split)
-
-      call mpas_pool_get_dimension(mesh, 'nCellsSolve', nCells_ptr)
-      nCells = nCells_ptr
-      call mpas_pool_get_array(diag, 'uReconstructX', uReconstructX)
-      !$acc exit data copyout(uReconstructX)
-      call mpas_pool_get_array(diag, 'uReconstructY', uReconstructY)
-      !$acc exit data copyout(uReconstructY)
-      call mpas_pool_get_array(diag, 'uReconstructZ', uReconstructZ)
-      !$acc exit data copyout(uReconstructZ)
-      call mpas_pool_get_array(diag, 'uReconstructZonal', uReconstructZonal)
-      !$acc exit data copyout(uReconstructZonal)
-      call mpas_pool_get_array(diag, 'uReconstructMeridional', uReconstructMeridional)
-      !$acc exit data copyout(uReconstructMeridional)
-
-      call mpas_pool_get_array(state, 'u', u_1, 1)
-      !$acc exit data copyout(u_1)
-      call mpas_pool_get_array(state, 'u', u_2, 2)
-      !$acc exit data copyout(u_2)
-      call mpas_pool_get_array(state, 'w', w_1, 1)
-      !$acc exit data copyout(w_1)
-      call mpas_pool_get_array(state, 'w', w_2, 2)
-      !$acc exit data copyout(w_2)
-      call mpas_pool_get_array(state, 'theta_m', theta_m_1, 1)
-      !$acc exit data copyout(theta_m_1)   ! use values from atm_init_coupled_diagnostics
-      call mpas_pool_get_array(state, 'theta_m', theta_m_2, 2)
-      !$acc exit data copyout(theta_m_2)   ! Delete gives incorrect results
-      call mpas_pool_get_array(state, 'rho_zz', rho_zz_1, 1)
-      !$acc exit data copyout(rho_zz_1)
-      call mpas_pool_get_array(state, 'rho_zz', rho_zz_2, 2)
-      !$acc exit data copyout(rho_zz_2)
-      call mpas_pool_get_array(state, 'scalars', scalars_1, 1)
-      !$acc exit data copyout(scalars_1)
-      call mpas_pool_get_array(state, 'scalars', scalars_2, 2)
-      !$acc exit data copyout(scalars_2)   ! Delete gives incorrect results
-
-
-      call mpas_pool_get_array(tend, 'u', tend_ru)
-      !$acc exit data copyout(tend_ru)
-      call mpas_pool_get_array(tend, 'rho_zz', tend_rho)
-      !$acc exit data copyout(tend_rho)
-      call mpas_pool_get_array(tend, 'theta_m', tend_rt)
-      !$acc exit data copyout(tend_rt)
-      call mpas_pool_get_array(tend, 'w', tend_rw)
-      !$acc exit data copyout(tend_rw)
-      call mpas_pool_get_array(tend, 'rt_diabatic_tend', rt_diabatic_tend)
-      !$acc exit data copyout(rt_diabatic_tend)
-      call mpas_pool_get_array(tend, 'u_euler', tend_u_euler)
-      !$acc exit data copyout(tend_u_euler)
-      call mpas_pool_get_array(tend, 'theta_euler', tend_theta_euler)
-      !$acc exit data copyout(tend_theta_euler)
-      call mpas_pool_get_array(tend, 'w_euler', tend_w_euler)
-      !$acc exit data copyout(tend_w_euler)
-      call mpas_pool_get_array(tend, 'w_pgf', tend_w_pgf)
-      !$acc exit data copyout(tend_w_pgf)
-      call mpas_pool_get_array(tend, 'w_buoy', tend_w_buoy)
-      !$acc exit data copyout(tend_w_buoy)
-      call mpas_pool_get_array(tend, 'scalars_tend', scalar_tend_save)
-      !$acc exit data copyout(scalar_tend_save)
-
-      if(config_apply_lbcs) then
-         call mpas_pool_get_array(lbc, 'lbc_u', lbc_u, 2)
-         !$acc exit data delete(lbc_u)
-         call mpas_pool_get_array(lbc, 'lbc_w', lbc_w, 2)
-         !$acc exit data delete(lbc_w)
-         call mpas_pool_get_array(lbc, 'lbc_ru', lbc_ru, 2)
-         !$acc exit data delete(lbc_ru)
-         call mpas_pool_get_array(lbc, 'lbc_rho_edge', lbc_rho_edge, 2)
-         !$acc exit data delete(lbc_rho_edge)
-         call mpas_pool_get_array(lbc, 'lbc_theta', lbc_theta, 2)
-         !$acc exit data delete(lbc_theta)
-         call mpas_pool_get_array(lbc, 'lbc_rtheta_m', lbc_rtheta_m, 2)
-         !$acc exit data delete(lbc_rtheta_m)
-         call mpas_pool_get_array(lbc, 'lbc_rho_zz', lbc_rho_zz, 2)
-         !$acc exit data delete(lbc_rho_zz)
-         call mpas_pool_get_array(lbc, 'lbc_rho', lbc_rho, 2)
-         !$acc exit data delete(lbc_rho)
-         call mpas_pool_get_array(lbc, 'lbc_scalars', lbc_scalars, 2)
-         !$acc exit data delete(lbc_scalars)
-         call mpas_pool_get_array(lbc, 'lbc_u', lbc_tend_u, 1)
-         !$acc exit data delete(lbc_tend_u)
-         call mpas_pool_get_array(lbc, 'lbc_ru', lbc_tend_ru, 1)
-         !$acc exit data delete(lbc_tend_ru)
-         call mpas_pool_get_array(lbc, 'lbc_rho_edge', lbc_tend_rho_edge, 1)
-         !$acc exit data delete(lbc_tend_rho_edge)
-         call mpas_pool_get_array(lbc, 'lbc_w', lbc_tend_w, 1)
-         !$acc exit data delete(lbc_tend_w)
-         call mpas_pool_get_array(lbc, 'lbc_theta', lbc_tend_theta, 1)
-         !$acc exit data delete(lbc_tend_theta)
-         call mpas_pool_get_array(lbc, 'lbc_rtheta_m', lbc_tend_rtheta_m, 1)
-         !$acc exit data delete(lbc_tend_rtheta_m)
-         call mpas_pool_get_array(lbc, 'lbc_rho_zz', lbc_tend_rho_zz, 1)
-         !$acc exit data delete(lbc_tend_rho_zz)
-         call mpas_pool_get_array(lbc, 'lbc_rho', lbc_tend_rho, 1)
-         !$acc exit data delete(lbc_tend_rho)
-         call mpas_pool_get_array(lbc, 'lbc_scalars', lbc_tend_scalars, 1)
-         !$acc exit data delete(lbc_tend_scalars)
-      end if
-
-      call mpas_pool_get_array(tend_physics, 'rthdynten', rthdynten)
-      !$acc exit data copyout(rthdynten)
-      MPAS_ACC_TIMER_STOP('atm_srk3 [ACC_data_xfer]')
-#endif
+      ! Dynamics state now stays device-resident for the whole run instead of being copied
+      ! back to the host every timestep here; mpas_atm_dynamics_state_update_self handles
+      ! the host sync, called only when an output-stream write is about to happen. This is
+      ! intentionally left as a no-op call site rather than removed, to keep this change
+      ! minimal and to preserve the atm_timestep call structure.
 
    end subroutine mpas_atm_post_dynamics
 
