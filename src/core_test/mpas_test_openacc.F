@@ -267,7 +267,7 @@ module mpas_test_core_openacc
         !$acc                   invArea(:),help_arr(:))
 
         ! Compute any helpers and initialize arrs
-        !$acc parallel default(present) async
+        !$acc parallel ACC_DEFAULT_ARG async
         !$acc loop gang worker vector
         do iCell=1,nCells
            invArea(iCell) = 1.0_RKIND / areaCell(iCell)
@@ -281,7 +281,7 @@ module mpas_test_core_openacc
         !$acc end parallel
 
         ! Compute helper values (for all owned cells)
-        !$acc parallel default(present) wait
+        !$acc parallel ACC_DEFAULT_ARG wait
         !$acc loop gang worker vector
         do iCell=1,nCellsSolve
            help_arr(iCell) = (nEdgesOnCell(iCell)+indexToCellID(iCell)) * invArea(iCell)
@@ -289,7 +289,7 @@ module mpas_test_core_openacc
         !$acc end parallel
 
         ! Compute final value (for all owned edges)
-        !$acc parallel default(present) wait
+        !$acc parallel ACC_DEFAULT_ARG wait
         !$acc loop gang worker vector private(cell1, cell2)
         do iEdge=1,nEdgesSolve
            cell1 = cellsOnEdge(1,iEdge)

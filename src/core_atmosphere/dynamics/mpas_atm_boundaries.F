@@ -224,14 +224,14 @@ module mpas_atm_boundaries
         index_qv = index_qv_ptr
 
         ! Compute lbc_rho_zz
-        !$acc parallel default(present)
+        !$acc parallel ACC_DEFAULT_ARG
         !$acc loop vector
         do k=1,nVertLevels
             zz(k,nCells+1) = 1.0_RKIND          ! Avoid potential division by zero in the following line
         end do
         !$acc end parallel
 
-        !$acc parallel default(present)
+        !$acc parallel ACC_DEFAULT_ARG
         !$acc loop gang vector collapse(2)
         do iCell=1,nCells+1
             do k=1,nVertLevels
@@ -241,7 +241,7 @@ module mpas_atm_boundaries
         !$acc end parallel
 
         ! Average lbc_rho_zz to edges
-        !$acc parallel default(present)
+        !$acc parallel ACC_DEFAULT_ARG
         !$acc loop gang worker
         do iEdge=1,nEdges
             cell1 = cellsOnEdge(1,iEdge)
@@ -255,7 +255,7 @@ module mpas_atm_boundaries
         end do
         !$acc end parallel
 
-        !$acc parallel default(present)
+        !$acc parallel ACC_DEFAULT_ARG
         !$acc loop gang vector collapse(2)
         do iEdge=1,nEdges+1
             do k=1,nVertLevels
@@ -280,7 +280,7 @@ module mpas_atm_boundaries
 
             dt = 1.0_RKIND / dt
 
-            !$acc parallel default(present)
+            !$acc parallel ACC_DEFAULT_ARG
             !$acc loop gang vector collapse(2)
             do iEdge=1,nEdges+1
                 do k=1,nVertLevels
@@ -414,7 +414,7 @@ module mpas_atm_boundaries
             idx = idx_ptr
         end if
 
-        !$acc parallel default(present)
+        !$acc parallel ACC_DEFAULT_ARG
         if (associated(tend)) then
             !$acc loop gang vector collapse(2)
             do j=1,horizDim+1
@@ -533,7 +533,7 @@ module mpas_atm_boundaries
         !
         if (associated(tend) .and. associated(state)) then
 
-            !$acc parallel default(present)
+            !$acc parallel ACC_DEFAULT_ARG
             !$acc loop gang vector collapse(2)
             do i=1, horizDim+1
                 do j=1, vertDim
@@ -549,7 +549,7 @@ module mpas_atm_boundaries
 
             idx=idx_ptr ! Avoid non-array pointer for OpenACC
 
-            !$acc parallel default(present)
+            !$acc parallel ACC_DEFAULT_ARG
             !$acc loop gang vector collapse(2)
             do i=1, horizDim+1
                 do j=1, vertDim
@@ -638,7 +638,7 @@ module mpas_atm_boundaries
         call mpas_pool_get_array(lbc, 'lbc_'//trim(field), tend, 1)
         call mpas_pool_get_array(lbc, 'lbc_'//trim(field), state, 2)
 
-        !$acc parallel default(present)
+        !$acc parallel ACC_DEFAULT_ARG
         !$acc loop gang vector collapse(3)
         do i=1, horizDim+1
             do j=1, vertDim

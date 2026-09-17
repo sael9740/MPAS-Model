@@ -498,7 +498,7 @@ module atm_core
 
       allocate(ke_vertex(nVertLevels,nVertices+1))  ! ke_vertex is a module variable defined in mpas_atm_time_integration.F
       allocate(ke_edge(nVertLevels,nEdges+1))       ! ke_edge is a module variable defined in mpas_atm_time_integration.F
-      !$acc parallel default(present)
+      !$acc parallel ACC_DEFAULT_ARG
       !$acc loop vector
       do k = 1, nVertLevels
          ke_vertex(k,nVertices+1) = 0.0_RKIND
