@@ -16,6 +16,13 @@ module mpas_atm_boundaries
 #define MPAS_ACC_TIMER_STOP(X)
 #endif
 
+! TODO(gpu-resident-io): lbc_u/lbc_w/lbc_theta/lbc_rho/lbc_scalars (time level 2) are now
+! permanently device-resident (see mpas_atm_dynamics_state_init in mpas_atm_time_integration.F),
+! so the explicit "!$acc update device(...)" below, right after these fields are read from the
+! lbc_in stream, is a manual stand-in for a generic "update device after stream read" hook on
+! MPAS_readStream. Remove this macro/comment and the update once that generic hook exists.
+#define GPU_RESIDENT_IO_TODO(X)
+
     use mpas_derived_types, only : mpas_pool_type, mpas_clock_type, block_type, mpas_time_type, mpas_timeInterval_type, MPAS_NOW, &
                                    MPAS_STREAM_LATEST_BEFORE, MPAS_STREAM_EARLIEST_STRICTLY_AFTER, &
                                    MPAS_streamManager_type
@@ -204,6 +211,8 @@ module mpas_atm_boundaries
             !$acc                   lbc_tend_rho, lbc_tend_scalars)
         end if
         !$acc enter data copyin(u, w, theta, rho, scalars)
+        GPU_RESIDENT_IO_TODO(lbc_u/lbc_w/lbc_theta/lbc_rho/lbc_scalars time level 2 are already device-resident; push the freshly-read host values explicitly)
+        !$acc update device(u, w, theta, rho, scalars)
         !$acc enter data create(ru, rho_edge, rtheta_m, rho_zz)
         MPAS_ACC_TIMER_STOP('mpas_atm_update_bdy_tend [ACC_data_xfer]')
 
@@ -331,7 +340,8 @@ module mpas_atm_boundaries
         end if
 
         !$acc exit data copyout(ru, rho_edge, rtheta_m, rho_zz)
-        !$acc exit data delete(u, w, theta, rho, scalars)
+        GPU_RESIDENT_IO_TODO(u/w/theta/rho/scalars alias lbc_u/lbc_w/lbc_theta/lbc_rho/lbc_scalars time level 2, which are permanently device-resident; do not force-delete them)
+        !$acc exit data copyout(u, w, theta, rho, scalars)
         MPAS_ACC_TIMER_STOP('mpas_atm_update_bdy_tend [ACC_data_xfer]')
 
         LBC_intv_end = currTime
