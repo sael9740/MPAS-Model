@@ -235,7 +235,7 @@ module atm_time_integration
       type (field2DReal), pointer :: tend_ru_physicsField, tend_rtheta_physicsField, tend_rho_physicsField
 #endif
 
-#ifdef MPAS_OPENACC
+#if defined(MPAS_OPENACC) && defined(ACC_DEVICE_RESIDENT)
       type (mpas_pool_type), pointer :: mesh
 
       real (kind=RKIND), dimension(:), pointer :: dvEdge
@@ -318,7 +318,7 @@ module atm_time_integration
       call mpas_allocate_scratch_field(tend_ru_physicsField)
 #endif
 
-#ifdef MPAS_OPENACC
+#if defined(MPAS_OPENACC) && defined(ACC_DEVICE_RESIDENT)
       nullify(mesh)
       call mpas_pool_get_subpool(domain % blocklist % structs, 'mesh', mesh)
 
@@ -538,7 +538,7 @@ module atm_time_integration
 
       type (domain_type), intent(inout) :: domain
 
-#ifdef MPAS_OPENACC
+#if defined(MPAS_OPENACC) && defined(ACC_DEVICE_RESIDENT)
       type (mpas_pool_type), pointer :: mesh
       type (mpas_pool_type), pointer :: state
       type (mpas_pool_type), pointer :: diag
@@ -830,7 +830,7 @@ module atm_time_integration
 
       type (domain_type), intent(inout) :: domain
 
-#ifdef MPAS_OPENACC
+#if defined(MPAS_OPENACC) && defined(ACC_DEVICE_RESIDENT)
       type (mpas_pool_type), pointer :: state
       type (mpas_pool_type), pointer :: diag
       type (mpas_pool_type), pointer :: tend
@@ -1429,7 +1429,7 @@ module atm_time_integration
       type (field2DReal), pointer :: tend_ru_physicsField, tend_rtheta_physicsField, tend_rho_physicsField
 #endif
 
-#ifdef MPAS_OPENACC
+#if defined(MPAS_OPENACC) && defined(ACC_DEVICE_RESIDENT)
       type (mpas_pool_type), pointer :: mesh
 
       real (kind=RKIND), dimension(:), pointer :: dvEdge
@@ -1513,7 +1513,7 @@ module atm_time_integration
       call mpas_deallocate_scratch_field(tend_ru_physicsField)
 #endif
 
-#ifdef MPAS_OPENACC
+#if defined(MPAS_OPENACC) && defined(ACC_DEVICE_RESIDENT)
       nullify(mesh)
       call mpas_pool_get_subpool(domain % blocklist % structs, 'mesh', mesh)
 
