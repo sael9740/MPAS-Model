@@ -147,6 +147,8 @@
 
  real(kind=RKIND),dimension(:,:),allocatable:: tend_th
 
+ integer:: nCellsSolve_acc
+
 !=================================================================================================================
 
  call mpas_pool_get_dimension(mesh,'nCells',nCells)
@@ -208,11 +210,45 @@
 !initialize the tendency for the potential temperature and all scalars due to PBL, convection,
 !and longwave and shortwave radiation:
  allocate(tend_th(nVertLevels,nCellsSolve))
- tend_th = 0._RKIND
+ !$acc enter data create(tend_th)
 
- tend_scalars(:,:,:)      = 0._RKIND
+ nCellsSolve_acc = nCellsSolve
+
+!tend_th, tend_scalars, and tend_rtheta_physics are all device-resident (tend_scalars/
+!tend_rtheta_physics persistently so -- see mpas_atm_dynamics_state_init and the enter data
+!create in atm_srk3 -- tend_th only for the duration of this call), and are read by
+!physics_get_tend_work's GPU-ported tendency-conversion step, so their zero-fill runs on the
+!device directly rather than on the host followed by a copy.
+ !$acc parallel default(present)
+ !$acc loop collapse(2)
+ do i = 1, nCellsSolve_acc
+ do k = 1, nVertLevels
+    tend_th(k,i) = 0._RKIND
+ end do
+ end do
+ !$acc end parallel
+
+ !$acc parallel default(present)
+ !$acc loop collapse(3)
+ do n = 1, num_scalars
+ do i = 1, nCellsSolve_acc
+ do k = 1, nVertLevels
+    tend_scalars(n,k,i) = 0._RKIND
+ end do
+ end do
+ end do
+ !$acc end parallel
+
+ !$acc parallel default(present)
+ !$acc loop collapse(2)
+ do i = 1, nCellsSolve_acc
+ do k = 1, nVertLevels
+    tend_rtheta_physics(k,i) = 0._RKIND
+ end do
+ end do
+ !$acc end parallel
+
  tend_ru_physics(:,:)     = 0._RKIND
- tend_rtheta_physics(:,:) = 0._RKIND
  tend_rho_physics(:,:)    = 0._RKIND
 
 
@@ -274,6 +310,7 @@
  if(size(rnifablten) == 0) deallocate(rnifablten)
  if(size(rnwfablten) == 0) deallocate(rnwfablten)
 
+ !$acc exit data delete(tend_th)
  deallocate(tend_th)
 
  end subroutine physics_get_tend
@@ -484,8 +521,12 @@
     enddo
  endif
 
-
 !convert the tendency for the potential temperature to tendency for the modified potential temperature:
+!This runs unconditionally (not gated by any physics scheme), against theta_m/scalars/tend_scalars/
+!tend_theta, all of which are device-resident (see pre_physics_get_tend and the enter data create of
+!tend_rtheta_physics in atm_srk3), so it runs on the device here rather than requiring a host round-trip.
+ !$acc parallel default(present)
+ !$acc loop collapse(2)
  do i = 1, nCellsSolve
  do k = 1, nVertLevels
     coeff = (1. + R_v/R_d * scalars(index_qv,k,i))
@@ -493,7 +534,7 @@
     tend_theta(k,i) = tend_theta(k,i) + tend_th(k,i)
  enddo
  enddo
-
+ !$acc end parallel
 
  end subroutine physics_get_tend_work
 

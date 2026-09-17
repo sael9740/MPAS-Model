@@ -2070,6 +2070,11 @@ module atm_time_integration
       call mpas_timer_stop('atm_compute_moist_coefficients')
 
 #ifdef DO_PHYSICS
+      ! tend_rtheta_physics is entered here, before physics_get_tend runs, so that the
+      ! GPU-ported tendency-conversion step at the end of physics_get_tend (see
+      ! mpas_atmphys_todynamics.F) has a device-resident array to zero and write into,
+      ! instead of computing on the host and needing a later copyin to pick up the result.
+      !$acc enter data create(tend_rtheta_physics)
       call pre_physics_get_tend(block % configs, state, diag, tend)
       call mpas_timer_start('physics_get_tend')
       rk_step = 1
@@ -2080,6 +2085,8 @@ module atm_time_integration
                              exchange_halo_group )
       call mpas_timer_stop('physics_get_tend')
       call post_physics_get_tend(block % configs, state, diag, tend)
+
+      !$acc enter data copyin(tend_rho_physics,tend_ru_physics)
 #else
 #ifndef MPAS_CAM_DYCORE
       !
@@ -2089,9 +2096,9 @@ module atm_time_integration
       tend_rtheta_physics(:,:) = 0.0_RKIND
       tend_rho_physics(:,:) = 0.0_RKIND
 #endif
-#endif
 
       !$acc enter data copyin(tend_rtheta_physics,tend_rho_physics,tend_ru_physics)
+#endif
 
       !
       ! IAU - Incremental Analysis Update
