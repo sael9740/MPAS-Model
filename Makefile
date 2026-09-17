@@ -904,8 +904,18 @@ ifeq "$(OPENACC)" "true"
 # build without it falls back to the hybrid/development model, where data
 # regions around each ported section perform real transfers and unported host
 # code still sees correct values. Only meaningful with OPENACC=true.
+#
+# ACC_DEFAULT_ARG is the default data clause placed on every !$acc parallel
+# construct. In the GPU-resident model it expands to default(present), so a field
+# that was never made resident becomes an immediate, named runtime error rather
+# than a silent copy of stale host data. In the hybrid/development model it
+# expands to nothing, letting the compiler generate an implicit data region per
+# construct so that unported host code still sees correct values.
 ifneq "$(ACC_DEVICE_RESIDENT)" "false"
         override CPPFLAGS += "-DACC_DEVICE_RESIDENT"
+        override CPPFLAGS += '-DACC_DEFAULT_ARG=default(present)'
+else
+        override CPPFLAGS += '-DACC_DEFAULT_ARG='
 endif #ACC_DEVICE_RESIDENT IF
 endif #OPENACC IF
 

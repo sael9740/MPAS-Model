@@ -213,7 +213,7 @@
 !than assume a narrower range is safe, tend_rtheta_physics/tend_ru_physics too -- are zeroed
 !over their full allocated range (1..nCells+1 / 1..nEdges+1), matching the ghost/padding cell
 !that mpas_allocate_scratch_field includes beyond nCells/nEdges.
- !$acc parallel default(present)
+ !$acc parallel ACC_DEFAULT_ARG
  !$acc loop collapse(2)
  do i = 1, nCellsSolve_acc
  do k = 1, nVertLevels
@@ -222,7 +222,7 @@
  end do
  !$acc end parallel
 
- !$acc parallel default(present)
+ !$acc parallel ACC_DEFAULT_ARG
  !$acc loop collapse(3)
  do n = 1, num_scalars
  do i = 1, nCellsSolve_acc
@@ -233,7 +233,7 @@
  end do
  !$acc end parallel
 
- !$acc parallel default(present)
+ !$acc parallel ACC_DEFAULT_ARG
  !$acc loop collapse(2)
  do i = 1, nCells_acc+1
  do k = 1, nVertLevels
@@ -242,7 +242,7 @@
  end do
  !$acc end parallel
 
- !$acc parallel default(present)
+ !$acc parallel ACC_DEFAULT_ARG
  !$acc loop collapse(2)
  do i = 1, nCells_acc+1
  do k = 1, nVertLevels
@@ -251,7 +251,7 @@
  end do
  !$acc end parallel
 
- !$acc parallel default(present)
+ !$acc parallel ACC_DEFAULT_ARG
  !$acc loop collapse(2)
  do i = 1, nEdges_acc+1
  do k = 1, nVertLevels
@@ -527,7 +527,7 @@
 !This runs unconditionally (not gated by any physics scheme), against theta_m/scalars/tend_scalars/
 !tend_theta, all of which are device-resident (see pre_physics_get_tend and the enter data create of
 !tend_rtheta_physics in atm_srk3), so it runs on the device here rather than requiring a host round-trip.
- !$acc parallel default(present)
+ !$acc parallel ACC_DEFAULT_ARG
  !$acc loop collapse(2)
  do i = 1, nCellsSolve
  do k = 1, nVertLevels

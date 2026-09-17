@@ -269,7 +269,7 @@ module mpas_vector_reconstruction
 
     ! loop over cell centers
     !$omp do schedule(runtime)
-    !$acc parallel default(present) if(lACCLocal)
+    !$acc parallel ACC_DEFAULT_ARG if(lACCLocal)
     !$acc loop gang
     do iCell = 1, nCells
       ! initialize the reconstructed vectors
@@ -304,7 +304,7 @@ module mpas_vector_reconstruction
 
     if (on_a_sphere) then
       !$omp do schedule(runtime)
-      !$acc parallel default(present) if(lACCLocal)
+      !$acc parallel ACC_DEFAULT_ARG if(lACCLocal)
       !$acc loop gang
       do iCell = 1, nCells
         clat = cos(latCell(iCell))
@@ -324,7 +324,7 @@ module mpas_vector_reconstruction
       !$omp end do
     else
       !$omp do schedule(runtime)
-      !$acc parallel default(present) if(lACCLocal)
+      !$acc parallel ACC_DEFAULT_ARG if(lACCLocal)
       !$acc loop gang vector collapse(2)
       do iCell = 1, nCells
         do k = 1, nVertLevels

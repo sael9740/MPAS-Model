@@ -208,7 +208,7 @@ module mpas_field_routines
            arr => f_cursor % array
            defaultVal = f_cursor % defaultValue
            d1 = f_cursor % dimSizes(1)
-           !$acc parallel default(present)
+           !$acc parallel ACC_DEFAULT_ARG
            !$acc loop
            do i = 1, d1
              arr(i) = defaultVal
@@ -331,7 +331,7 @@ module mpas_field_routines
            defaultVal = f_cursor % defaultValue
            d1 = f_cursor % dimSizes(1)
            d2 = f_cursor % dimSizes(2)
-           !$acc parallel default(present)
+           !$acc parallel ACC_DEFAULT_ARG
            !$acc loop collapse(2)
            do i = 1, d2
              do j = 1, d1
@@ -459,7 +459,7 @@ module mpas_field_routines
            d1 = f_cursor % dimSizes(1)
            d2 = f_cursor % dimSizes(2)
            d3 = f_cursor % dimSizes(3)
-           !$acc parallel default(present)
+           !$acc parallel ACC_DEFAULT_ARG
            !$acc loop collapse(3)
            do i = 1, d3
              do j = 1, d2
@@ -591,7 +591,7 @@ module mpas_field_routines
            arr => f_cursor % array
            defaultVal = f_cursor % defaultValue
            d1 = f_cursor % dimSizes(1)
-           !$acc parallel default(present)
+           !$acc parallel ACC_DEFAULT_ARG
            !$acc loop
            do i = 1, d1
              arr(i) = defaultVal
@@ -714,7 +714,7 @@ module mpas_field_routines
            defaultVal = f_cursor % defaultValue
            d1 = f_cursor % dimSizes(1)
            d2 = f_cursor % dimSizes(2)
-           !$acc parallel default(present)
+           !$acc parallel ACC_DEFAULT_ARG
            !$acc loop collapse(2)
            do i = 1, d2
              do j = 1, d1
@@ -841,7 +841,7 @@ module mpas_field_routines
            d1 = f_cursor % dimSizes(1)
            d2 = f_cursor % dimSizes(2)
            d3 = f_cursor % dimSizes(3)
-           !$acc parallel default(present)
+           !$acc parallel ACC_DEFAULT_ARG
            !$acc loop collapse(3)
            do i = 1, d3
              do j = 1, d2
@@ -974,7 +974,7 @@ module mpas_field_routines
            d2 = f_cursor % dimSizes(2)
            d3 = f_cursor % dimSizes(3)
            d4 = f_cursor % dimSizes(4)
-           !$acc parallel default(present)
+           !$acc parallel ACC_DEFAULT_ARG
            !$acc loop collapse(4)
            do i = 1, d4
              do j = 1, d3
@@ -1114,7 +1114,7 @@ module mpas_field_routines
            d3 = f_cursor % dimSizes(3)
            d4 = f_cursor % dimSizes(4)
            d5 = f_cursor % dimSizes(5)
-           !$acc parallel default(present)
+           !$acc parallel ACC_DEFAULT_ARG
            !$acc loop collapse(5)
            do i = 1, d5
              do j = 1, d4

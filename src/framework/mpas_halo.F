@@ -694,7 +694,7 @@ module mpas_halo
                     !
                     ! Pack send buffer for all neighbors for current field
                     !
-                    !$acc parallel default(present) attach(group % fields(i) % r1arr) if(useGPUAwareMPI)
+                    !$acc parallel ACC_DEFAULT_ARG attach(group % fields(i) % r1arr) if(useGPUAwareMPI)
                     !$acc loop gang collapse(2)
                     do iEndp = 1, nSendEndpts
                         do iHalo = 1, nHalos
@@ -723,7 +723,7 @@ module mpas_halo
                     ! Present should also cause an attach action. OpenACC Spec2.7 Section 2.7.2 describes 'attach action'
                     ! !$acc data present(group) present(group % fields(i)) present(group % sendBuf(:), group % fields(i) % sendListSrc(:,:,:))
 
-                    !$acc parallel default(present) attach(group % fields(i) % r2arr) if(useGPUAwareMPI)
+                    !$acc parallel ACC_DEFAULT_ARG attach(group % fields(i) % r2arr) if(useGPUAwareMPI)
                     !$acc loop gang collapse(3)
                     do iEndp = 1, nSendEndpts
                         do iHalo = 1, nHalos
@@ -750,7 +750,7 @@ module mpas_halo
                     !
                     ! Pack send buffer for all neighbors for current field
                     !
-                    !$acc parallel default(present) attach(group % fields(i) % r3arr) if(useGPUAwareMPI)
+                    !$acc parallel ACC_DEFAULT_ARG attach(group % fields(i) % r3arr) if(useGPUAwareMPI)
                     !$acc loop gang collapse(4)
                     do iEndp = 1, nSendEndpts
                         do iHalo = 1, nHalos
@@ -841,7 +841,7 @@ module mpas_halo
                         !
                         ! Unpack recv buffer from all neighbors for current field
                         !
-                        !$acc parallel default(present) attach(group % fields(i) % r1arr) if(useGPUAwareMPI)
+                        !$acc parallel ACC_DEFAULT_ARG attach(group % fields(i) % r1arr) if(useGPUAwareMPI)
                         !$acc loop gang
                         do iHalo = 1, nHalos
                             !$acc loop vector
@@ -861,7 +861,7 @@ module mpas_halo
                         !
                         ! Unpack recv buffer from all neighbors for current field
                         !
-                        !$acc parallel default(present) attach(group % fields(i) % r2arr) if(useGPUAwareMPI)
+                        !$acc parallel ACC_DEFAULT_ARG attach(group % fields(i) % r2arr) if(useGPUAwareMPI)
                         !$acc loop gang
                         do iHalo = 1, nHalos
                             !$acc loop worker
@@ -884,7 +884,7 @@ module mpas_halo
                         !
                         ! Unpack recv buffer from all neighbors for current field
                         !
-                        !$acc parallel default(present) attach(group % fields(i) % r3arr) if(useGPUAwareMPI)
+                        !$acc parallel ACC_DEFAULT_ARG attach(group % fields(i) % r3arr) if(useGPUAwareMPI)
                         !$acc loop gang collapse(2)
                         do iHalo = 1, nHalos
                             do j = 1, maxNRecvList
