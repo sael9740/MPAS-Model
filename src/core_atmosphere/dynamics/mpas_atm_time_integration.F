@@ -1970,12 +1970,14 @@ module atm_time_integration
       call mpas_allocate_scratch_field(tend_ru_physicsField)
 #endif
 
+      ! The ghost/padding-cell zero-fills that used to run here (tend_rtheta_physics(:,nCells+1),
+      ! tend_rho_physics(:,nCells+1), tend_ru_physics(:,nEdges+1)) are superseded by the
+      ! full-range GPU zero-fill of these arrays in physics_get_tend (see the enter data create
+      ! below and mpas_atmphys_todynamics.F), which covers this range too and runs before
+      ! anything reads these arrays on the device.
       call mpas_pool_get_array(tend_physics, 'tend_rtheta_physics', tend_rtheta_physics)
-      tend_rtheta_physics(:,nCells+1) = 0.0_RKIND
       call mpas_pool_get_array(tend_physics, 'tend_rho_physics', tend_rho_physics)
-      tend_rho_physics(:,nCells+1) = 0.0_RKIND
       call mpas_pool_get_array(tend_physics, 'tend_ru_physics', tend_ru_physics)
-      tend_ru_physics(:,nEdges+1) = 0.0_RKIND
 
       !
       ! Initialize RK weights
@@ -2070,11 +2072,11 @@ module atm_time_integration
       call mpas_timer_stop('atm_compute_moist_coefficients')
 
 #ifdef DO_PHYSICS
-      ! tend_rtheta_physics is entered here, before physics_get_tend runs, so that the
-      ! GPU-ported tendency-conversion step at the end of physics_get_tend (see
-      ! mpas_atmphys_todynamics.F) has a device-resident array to zero and write into,
+      ! tend_rtheta_physics, tend_rho_physics, and tend_ru_physics are entered here, before
+      ! physics_get_tend runs, so that its GPU-ported zero-fills and tendency-conversion step
+      ! (see mpas_atmphys_todynamics.F) have device-resident arrays to zero and write into,
       ! instead of computing on the host and needing a later copyin to pick up the result.
-      !$acc enter data create(tend_rtheta_physics)
+      !$acc enter data create(tend_rtheta_physics,tend_rho_physics,tend_ru_physics)
       call pre_physics_get_tend(block % configs, state, diag, tend)
       call mpas_timer_start('physics_get_tend')
       rk_step = 1
@@ -2085,8 +2087,6 @@ module atm_time_integration
                              exchange_halo_group )
       call mpas_timer_stop('physics_get_tend')
       call post_physics_get_tend(block % configs, state, diag, tend)
-
-      !$acc enter data copyin(tend_rho_physics,tend_ru_physics)
 #else
 #ifndef MPAS_CAM_DYCORE
       !
