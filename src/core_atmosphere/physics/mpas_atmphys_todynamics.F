@@ -132,6 +132,7 @@
  real(kind=RKIND),dimension(:,:),allocatable:: tend_th
 
  integer:: nCellsSolve_acc
+ integer:: nCells_acc, nEdges_acc
 
 !=================================================================================================================
 
@@ -197,12 +198,21 @@
  !$acc enter data create(tend_th)
 
  nCellsSolve_acc = nCellsSolve
+ nCells_acc = nCells
+ nEdges_acc = nEdges
 
-!tend_th, tend_scalars, and tend_rtheta_physics are all device-resident (tend_scalars/
-!tend_rtheta_physics persistently so -- see mpas_atm_dynamics_state_init and the enter data
-!create in atm_srk3 -- tend_th only for the duration of this call), and are read by
-!physics_get_tend_work's GPU-ported tendency-conversion step, so their zero-fill runs on the
-!device directly rather than on the host followed by a copy.
+!tend_th, tend_scalars, tend_rtheta_physics, tend_rho_physics, and tend_ru_physics are all
+!device-resident (tend_scalars/tend_rtheta_physics/tend_rho_physics/tend_ru_physics
+!persistently so -- see mpas_atm_dynamics_state_init and the enter data create/copyin in
+!atm_srk3 -- tend_th only for the duration of this call), so their zero-fill runs on the
+!device directly rather than on the host followed by a copy. tend_th and tend_scalars are
+!only ever read within cellSolveStart..cellSolveEnd (see physics_get_tend_work and
+!atm_advance_scalars_work), so zeroing 1..nCellsSolve is sufficient for them; tend_rho_physics
+!is read over the wider cellStart..cellEnd range (atm_compute_dyn_tend_work), so it -- and,
+!to match the original tend_rtheta_physics(:,:)/tend_ru_physics(:,:) semantics exactly rather
+!than assume a narrower range is safe, tend_rtheta_physics/tend_ru_physics too -- are zeroed
+!over their full allocated range (1..nCells+1 / 1..nEdges+1), matching the ghost/padding cell
+!that mpas_allocate_scratch_field includes beyond nCells/nEdges.
  !$acc parallel default(present)
  !$acc loop collapse(2)
  do i = 1, nCellsSolve_acc
@@ -225,15 +235,30 @@
 
  !$acc parallel default(present)
  !$acc loop collapse(2)
- do i = 1, nCellsSolve_acc
+ do i = 1, nCells_acc+1
  do k = 1, nVertLevels
     tend_rtheta_physics(k,i) = 0._RKIND
  end do
  end do
  !$acc end parallel
 
- tend_ru_physics(:,:)     = 0._RKIND
- tend_rho_physics(:,:)    = 0._RKIND
+ !$acc parallel default(present)
+ !$acc loop collapse(2)
+ do i = 1, nCells_acc+1
+ do k = 1, nVertLevels
+    tend_rho_physics(k,i) = 0._RKIND
+ end do
+ end do
+ !$acc end parallel
+
+ !$acc parallel default(present)
+ !$acc loop collapse(2)
+ do i = 1, nEdges_acc+1
+ do k = 1, nVertLevels
+    tend_ru_physics(k,i) = 0._RKIND
+ end do
+ end do
+ !$acc end parallel
 
 
 !in case some variables are not allocated due to their associated packages. We need to make their pointers
