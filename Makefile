@@ -4,11 +4,12 @@ ifneq "${MPAS_SHELL}" ""
         SHELL = ${MPAS_SHELL}
 endif
 
-# GPU_MEM_MANAGED=true appends the "mem:managed" suboption to the nvhpc build
-# target's -gpu= flag, so OpenACC allocations use CUDA Managed Memory instead
-# of the default discrete/separate host-device memory model.
-ifeq "$(GPU_MEM_MANAGED)" "true"
-        ACC_MEM_MODE = ,mem:managed
+# GPU_MEM_MODE=<separate|managed|unified>[:suboption[:suboption...]] appends a
+# "mem:..." suboption to the nvhpc build target's -gpu= flag, selecting the
+# OpenACC memory model (and any nvhpc mem suboptions, e.g. unified:managedalloc).
+# If unset, no mem:... suboption is passed, which defaults to separate memory.
+ifneq "$(GPU_MEM_MODE)" ""
+        ACC_MEM_MODE = ,mem:$(GPU_MEM_MODE)
 else
         ACC_MEM_MODE =
 endif
@@ -180,7 +181,7 @@ nvhpc:   # BUILDTARGET NVIDIA HPC SDK
 	"OPENMP = $(OPENMP)" \
 	"OPENACC = $(OPENACC)" \
 	"MPAS_NVTX = $(MPAS_NVTX)" \
-	"GPU_MEM_MANAGED = $(GPU_MEM_MANAGED)" \
+	"GPU_MEM_MODE = $(GPU_MEM_MODE)" \
 	"NVHPC_BFB = $(NVHPC_BFB)" \
 	"CPPFLAGS = $(MODEL_FORMULATION) -D_MPI -DCPRPGI" )
 
@@ -1689,7 +1690,7 @@ errmsg:
 	@echo "    OPENMP=true   - builds and links with OpenMP flags. Default is to not use OpenMP."
 	@echo "    OPENACC=true  - builds and links with OpenACC flags. Default is to not use OpenACC."
 	@echo "    MPAS_NVTX=true - instruments all MPAS timers with NVTX profiling regions (requires nvhpc). Default is to not use NVTX."
-	@echo "    GPU_MEM_MANAGED=true - builds OpenACC code with CUDA Managed Memory (-gpu=mem:managed) instead of the default discrete/separate memory model (requires nvhpc). Default is to not use managed memory."
+	@echo "    GPU_MEM_MODE=<separate|managed|unified>[:suboption[:suboption...]] - selects the OpenACC GPU memory model via -gpu=mem:<...> (requires nvhpc), e.g. GPU_MEM_MODE=unified:managedalloc maps to -gpu=mem:unified:managedalloc. Default is unset, which leaves -gpu=mem:... off (nvhpc default of separate host/device memory)."
 	@echo "    NVHPC_BFB=true - adds -Mnofma (CPU/GPU) and -gpu=math_uniform (GPU) so nvhpc GPU builds are bit-for-bit reproducible against nvhpc CPU builds (requires nvhpc). Default is off."
 	@echo "    PRECISION=double - builds with default double-precision real kind. Default is to use single-precision."
 	@echo "    SHAREDLIB=true - generate position-independent code suitable for use in a shared library. Default is false."
