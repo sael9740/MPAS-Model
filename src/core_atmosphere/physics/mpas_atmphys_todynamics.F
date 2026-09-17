@@ -68,29 +68,13 @@
  type(mpas_pool_type),intent(in):: diag
  type(mpas_pool_type),intent(in):: tend
 
-#ifdef MPAS_OPENACC
-!local variables:
- real(kind=RKIND),dimension(:,:),pointer:: mass          ! time level 2 rho_zz
- real(kind=RKIND),dimension(:,:),pointer:: mass_edge     ! diag rho_edge
- real(kind=RKIND),dimension(:,:),pointer:: theta_m       ! time level 1
- real(kind=RKIND),dimension(:,:,:),pointer:: scalars
-
- real(kind=RKIND),dimension(:,:),pointer:: tend_u_phys
- real(kind=RKIND),dimension(:,:,:),pointer:: tend_scalars
-
- MPAS_ACC_TIMER_START('atm_srk3: physics ACC_data_xfer')
- call mpas_pool_get_array(state,'theta_m' ,theta_m,1)
- call mpas_pool_get_array(state,'scalars' ,scalars,1)
- call mpas_pool_get_array(state,'rho_zz'  ,mass,2   )
- call mpas_pool_get_array(diag ,'rho_edge',mass_edge)
- call mpas_pool_get_array(diag ,'tend_u_phys',tend_u_phys)
-
- !$acc update self(theta_m, scalars, mass, mass_edge)
-
- call mpas_pool_get_array(tend,'scalars_tend',tend_scalars)
- !$acc update self(tend_scalars) ! Probably not needed
- MPAS_ACC_TIMER_STOP('atm_srk3: physics ACC_data_xfer')
-#endif
+!theta_m, scalars, mass (rho_zz), and tend_scalars (scalars_tend) no longer need staging here:
+!theta_m/scalars are permanently device-resident (see mpas_atm_dynamics_state_init) and are now
+!read directly by physics_get_tend_work's GPU-ported tendency-conversion step instead of a host
+!copy; tend_scalars is zeroed directly on device in physics_get_tend. mass_edge (rho_edge) was
+!only read by scheme-gated code in physics_get_tend_work, which does not execute for this test
+!configuration. If a physics scheme is enabled and reads mass/mass_edge from CPU-only code, that
+!staging will need to be reinstated here.
 
  end subroutine pre_physics_get_tend
  
@@ -325,15 +309,8 @@
  type(mpas_pool_type),intent(in):: diag
  type(mpas_pool_type),intent(in):: tend
 
-#ifdef MPAS_OPENACC
-!local variables:
- real(kind=RKIND),dimension(:,:,:),pointer:: tend_scalars
-
- MPAS_ACC_TIMER_START('atm_srk3: physics ACC_data_xfer')
- call mpas_pool_get_array(tend,'scalars_tend',tend_scalars)
- !$acc update device(tend_scalars)
- MPAS_ACC_TIMER_STOP('atm_srk3: physics ACC_data_xfer')
-#endif
+!tend_scalars (scalars_tend) no longer needs staging here: it is zeroed directly on device in
+!physics_get_tend (see pre_physics_get_tend for the corresponding note).
 
  end subroutine post_physics_get_tend
 
