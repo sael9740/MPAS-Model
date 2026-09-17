@@ -2701,20 +2701,26 @@ module atm_time_integration
 #ifdef DO_PHYSICS
       call mpas_pool_get_array(state, 'scalars', scalars_1, 1)
       call mpas_pool_get_array(state, 'scalars', scalars_2, 2)
+      call mpas_pool_get_array(state, 'theta_m', theta_m, 2)
+      call mpas_pool_get_array(tend_physics, 'rthdynten', rthdynten)
+      call mpas_pool_get_array(tend_physics, 'rqvdynten', rqvdynten)
+
+      ! Tight data region for the physics-boundary fields, covering everything up to the
+      ! microphysics call. It is closed just before that call and reopened just after (rather
+      ! than left open across it) so that, in a build without persistent GPU residency, this
+      ! section's host writes (the cu-scheme dynamical tendency, when active) are actually
+      ! pushed to device before pre_microphysics/post_microphysics do their own internal
+      ! update host/device on an overlapping field set, and so that code after the call gets a
+      ! fresh pull of whatever physics wrote, rather than stale data left over from before the
+      ! call. In GPU-resident mode (today) these fields already hold a persistent reference
+      ! from mpas_atm_dynamics_state_init, so entering/exiting this region is just a
+      ! reference-count bump/decrement -- no transfer, no cost -- and once physics itself runs
+      ! on GPU there is no host-side computation left in this span for the region to protect
+      ! either way. No explicit update self/device calls are needed in any of these cases.
+      !$acc data copy(scalars_1, scalars_2, theta_m, rthdynten, rqvdynten)
 
       if(config_convection_scheme == 'cu_grell_freitas' .or. &
          config_convection_scheme == 'cu_ntiedtke') then
-
-         ! scalars_1/scalars_2/theta_m/rthdynten are all persistently device-resident (see
-         ! mpas_atm_dynamics_state_init), but this block is genuine host-only computation that
-         ! reads and rewrites rthdynten, so it needs real content synchronization -- a
-         ! data/enter-exit-data region would only bump the already-outstanding reference count
-         ! and not actually transfer anything. Gated inside this if so it costs nothing when
-         ! this scheme isn't selected, matching config_convection_scheme for this test case.
-         call mpas_pool_get_array(state, 'theta_m', theta_m, 2)
-         call mpas_pool_get_array(tend_physics, 'rthdynten', rthdynten)
-         call mpas_pool_get_array(tend_physics, 'rqvdynten', rqvdynten)
-         !$acc update self(scalars_1, scalars_2, theta_m, rthdynten)
 
          !NOTE: The calculation of the tendency due to horizontal and vertical advection for the water vapor mixing ratio
          !requires that the subroutine atm_advance_scalars_mono was called on the third Runge Kutta step, so that a halo
@@ -2733,8 +2739,6 @@ module atm_time_integration
             end do
          end do
 
-         !$acc update device(rthdynten)
-
       end if
 
       !simply set to zero negative mixing ratios of different water species (for now). This runs
@@ -2751,6 +2755,8 @@ module atm_time_integration
       end do
       !$acc end parallel
 
+      !$acc end data
+
       !call microphysics schemes:
       if (trim(config_microp_scheme) /= 'off')  then
         call pre_microphysics( block % configs, state, diag, 2)
@@ -2764,6 +2770,16 @@ module atm_time_integration
         call mpas_timer_stop('microphysics')
         call post_microphysics( block % configs, state, diag, tend, 2)
       end if
+
+      ! Reopened after the microphysics call (rather than left open across it -- see the comment
+      ! above the first region) so that anything below reading scalars_2/theta_m/rthdynten/
+      ! rqvdynten gets a fresh pull of whatever physics wrote, instead of stale pre-call data.
+      ! Currently there is nothing in this subroutine between here and #endif that reads these
+      ! fields again, so this region has no live content today; it establishes the same
+      ! zero-cost-when-resident / correct-when-not pattern as the region above for whenever
+      ! code here needs them.
+      !$acc data copy(scalars_1, scalars_2, theta_m, rthdynten, rqvdynten)
+      !$acc end data
 
       !
       ! Note: A halo exchange for 'exner' here as well as at the end of
