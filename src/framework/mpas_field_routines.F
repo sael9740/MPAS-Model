@@ -145,6 +145,11 @@ module mpas_field_routines
        type (field1dInteger), pointer :: f_cursor
        integer :: threadNum
        integer :: i
+#ifdef ACC_DEVICE_RESIDENT
+       integer, dimension(:), pointer :: arr
+       integer :: defaultVal
+       integer :: d1
+#endif
 
        if(f % isPersistent) then
           return
@@ -172,6 +177,14 @@ module mpas_field_routines
            if(.not.associated(f_cursor % array)) then
              if ( threadNum == 0 ) then
                allocate(f_cursor % array(f_cursor % dimSizes(1)))
+#ifdef ACC_DEVICE_RESIDENT
+               ! A scratch field is device-resident for as long as its host allocation
+               ! lives, so it is created on the device here and deleted in the matching
+               ! mpas_deallocate_scratch_field. Without ACC_DEVICE_RESIDENT (the hybrid/
+               ! development model) this is skipped, and staging is left to the data
+               ! regions around whichever ported sections use the field.
+               !$acc enter data create(f_cursor % array)
+#endif
              end if
            end if
            f_cursor => f_cursor % next
@@ -183,11 +196,31 @@ module mpas_field_routines
          if ( init_array ) then
          f_cursor => f
          do while(associated(f_cursor))
+#ifdef ACC_DEVICE_RESIDENT
+           ! With the field device-resident, filling it on the host would be wasted
+           ! work: nothing reads that host copy before the device copy is written, and
+           ! this loop is serial whenever OpenMP is off. The array is aliased to a local
+           ! pointer and the bounds/default value to local scalars first, because every
+           ! ported compute construct in MPAS names plain locals rather than derived-type
+           ! components: referencing f_cursor % array inside the kernel would additionally
+           ! require the field type itself to be device-resident and attached (mpas_halo.F
+           ! is the one place that needs that, and pays for it with enter data + attach).
+           arr => f_cursor % array
+           defaultVal = f_cursor % defaultValue
+           d1 = f_cursor % dimSizes(1)
+           !$acc parallel default(present)
+           !$acc loop
+           do i = 1, d1
+             arr(i) = defaultVal
+           end do
+           !$acc end parallel
+#else
            !$omp do schedule(runtime)
            do i = 1, f_cursor % dimSizes(1)
              f_cursor % array(i) = f_cursor % defaultValue
            end do
            !$omp end do
+#endif
            f_cursor => f_cursor % next
          end do
          end if
@@ -234,6 +267,11 @@ module mpas_field_routines
        type (field2dInteger), pointer :: f_cursor
        integer :: threadNum
        integer :: i,j
+#ifdef ACC_DEVICE_RESIDENT
+       integer, dimension(:,:), pointer :: arr
+       integer :: defaultVal
+       integer :: d1, d2
+#endif
 
        if(f % isPersistent) then
           return
@@ -261,6 +299,14 @@ module mpas_field_routines
            if(.not.associated(f_cursor % array)) then
              if ( threadNum == 0 ) then
                allocate(f_cursor % array(f_cursor % dimSizes(1), f_cursor % dimSizes(2)))
+#ifdef ACC_DEVICE_RESIDENT
+               ! A scratch field is device-resident for as long as its host allocation
+               ! lives, so it is created on the device here and deleted in the matching
+               ! mpas_deallocate_scratch_field. Without ACC_DEVICE_RESIDENT (the hybrid/
+               ! development model) this is skipped, and staging is left to the data
+               ! regions around whichever ported sections use the field.
+               !$acc enter data create(f_cursor % array)
+#endif
              end if
            end if
            f_cursor => f_cursor % next
@@ -272,6 +318,28 @@ module mpas_field_routines
          if ( init_array ) then
          f_cursor => f
          do while(associated(f_cursor))
+#ifdef ACC_DEVICE_RESIDENT
+           ! With the field device-resident, filling it on the host would be wasted
+           ! work: nothing reads that host copy before the device copy is written, and
+           ! this loop is serial whenever OpenMP is off. The array is aliased to a local
+           ! pointer and the bounds/default value to local scalars first, because every
+           ! ported compute construct in MPAS names plain locals rather than derived-type
+           ! components: referencing f_cursor % array inside the kernel would additionally
+           ! require the field type itself to be device-resident and attached (mpas_halo.F
+           ! is the one place that needs that, and pays for it with enter data + attach).
+           arr => f_cursor % array
+           defaultVal = f_cursor % defaultValue
+           d1 = f_cursor % dimSizes(1)
+           d2 = f_cursor % dimSizes(2)
+           !$acc parallel default(present)
+           !$acc loop collapse(2)
+           do i = 1, d2
+             do j = 1, d1
+               arr(j, i) = defaultVal
+             end do
+           end do
+           !$acc end parallel
+#else
            !$omp do collapse(2) schedule(runtime)
            do i = 1, f_cursor % dimSizes(2)
              do j = 1, f_cursor % dimSizes(1)
@@ -279,6 +347,7 @@ module mpas_field_routines
              end do
            end do
            !$omp end do
+#endif
            f_cursor => f_cursor % next
          end do
          end if
@@ -327,6 +396,11 @@ module mpas_field_routines
        type (field3dInteger), pointer :: f_cursor
        integer :: threadNum
        integer :: i,j,k
+#ifdef ACC_DEVICE_RESIDENT
+       integer, dimension(:,:,:), pointer :: arr
+       integer :: defaultVal
+       integer :: d1, d2, d3
+#endif
 
        if(f % isPersistent) then
           return
@@ -353,6 +427,14 @@ module mpas_field_routines
            do while(associated(f_cursor))
              if(.not.associated(f_cursor % array)) then
                allocate(f_cursor % array(f_cursor % dimSizes(1), f_cursor % dimSizes(2), f_cursor % dimSizes(3)))
+#ifdef ACC_DEVICE_RESIDENT
+               ! A scratch field is device-resident for as long as its host allocation
+               ! lives, so it is created on the device here and deleted in the matching
+               ! mpas_deallocate_scratch_field. Without ACC_DEVICE_RESIDENT (the hybrid/
+               ! development model) this is skipped, and staging is left to the data
+               ! regions around whichever ported sections use the field.
+               !$acc enter data create(f_cursor % array)
+#endif
              end if
              f_cursor => f_cursor % next
            end do
@@ -363,6 +445,31 @@ module mpas_field_routines
          if ( init_array ) then
          f_cursor => f
          do while(associated(f_cursor))
+#ifdef ACC_DEVICE_RESIDENT
+           ! With the field device-resident, filling it on the host would be wasted
+           ! work: nothing reads that host copy before the device copy is written, and
+           ! this loop is serial whenever OpenMP is off. The array is aliased to a local
+           ! pointer and the bounds/default value to local scalars first, because every
+           ! ported compute construct in MPAS names plain locals rather than derived-type
+           ! components: referencing f_cursor % array inside the kernel would additionally
+           ! require the field type itself to be device-resident and attached (mpas_halo.F
+           ! is the one place that needs that, and pays for it with enter data + attach).
+           arr => f_cursor % array
+           defaultVal = f_cursor % defaultValue
+           d1 = f_cursor % dimSizes(1)
+           d2 = f_cursor % dimSizes(2)
+           d3 = f_cursor % dimSizes(3)
+           !$acc parallel default(present)
+           !$acc loop collapse(3)
+           do i = 1, d3
+             do j = 1, d2
+               do k = 1, d1
+                 arr(k, j, i) = defaultVal
+               end do
+             end do
+           end do
+           !$acc end parallel
+#else
            !$omp do collapse(3) schedule(runtime)
            do i = 1, f_cursor % dimSizes(3)
              do j = 1, f_cursor % dimSizes(2)
@@ -372,6 +479,7 @@ module mpas_field_routines
              end do
            end do
            !$omp end do
+#endif
            f_cursor => f_cursor % next
          end do
          end if
@@ -420,6 +528,11 @@ module mpas_field_routines
        type (field1dReal), pointer :: f_cursor
        integer :: threadNum
        integer :: i
+#ifdef ACC_DEVICE_RESIDENT
+       real (kind=RKIND), dimension(:), pointer :: arr
+       real (kind=RKIND) :: defaultVal
+       integer :: d1
+#endif
 
        if(f % isPersistent) then
           return
@@ -447,6 +560,14 @@ module mpas_field_routines
            do while(associated(f_cursor))
              if(.not.associated(f_cursor % array)) then
                allocate(f_cursor % array(f_cursor % dimSizes(1)))
+#ifdef ACC_DEVICE_RESIDENT
+               ! A scratch field is device-resident for as long as its host allocation
+               ! lives, so it is created on the device here and deleted in the matching
+               ! mpas_deallocate_scratch_field. Without ACC_DEVICE_RESIDENT (the hybrid/
+               ! development model) this is skipped, and staging is left to the data
+               ! regions around whichever ported sections use the field.
+               !$acc enter data create(f_cursor % array)
+#endif
              end if
              f_cursor => f_cursor % next
            end do
@@ -458,11 +579,31 @@ module mpas_field_routines
          if ( init_array ) then
          f_cursor => f
          do while(associated(f_cursor))
+#ifdef ACC_DEVICE_RESIDENT
+           ! With the field device-resident, filling it on the host would be wasted
+           ! work: nothing reads that host copy before the device copy is written, and
+           ! this loop is serial whenever OpenMP is off. The array is aliased to a local
+           ! pointer and the bounds/default value to local scalars first, because every
+           ! ported compute construct in MPAS names plain locals rather than derived-type
+           ! components: referencing f_cursor % array inside the kernel would additionally
+           ! require the field type itself to be device-resident and attached (mpas_halo.F
+           ! is the one place that needs that, and pays for it with enter data + attach).
+           arr => f_cursor % array
+           defaultVal = f_cursor % defaultValue
+           d1 = f_cursor % dimSizes(1)
+           !$acc parallel default(present)
+           !$acc loop
+           do i = 1, d1
+             arr(i) = defaultVal
+           end do
+           !$acc end parallel
+#else
            !$omp do schedule(runtime)
            do i = 1, f_cursor % dimSizes(1)
              f_cursor % array(i) = f_cursor % defaultValue
            end do
            !$omp end do
+#endif
            f_cursor => f_cursor % next
          end do
          end if
@@ -509,6 +650,11 @@ module mpas_field_routines
        type (field2dReal), pointer :: f_cursor
        integer :: threadNum
        integer :: i,j
+#ifdef ACC_DEVICE_RESIDENT
+       real (kind=RKIND), dimension(:,:), pointer :: arr
+       real (kind=RKIND) :: defaultVal
+       integer :: d1, d2
+#endif
 
        if(f % isPersistent) then
           return
@@ -536,6 +682,14 @@ module mpas_field_routines
            do while(associated(f_cursor))
              if(.not.associated(f_cursor % array)) then
                allocate(f_cursor % array(f_cursor % dimSizes(1), f_cursor % dimSizes(2)))
+#ifdef ACC_DEVICE_RESIDENT
+               ! A scratch field is device-resident for as long as its host allocation
+               ! lives, so it is created on the device here and deleted in the matching
+               ! mpas_deallocate_scratch_field. Without ACC_DEVICE_RESIDENT (the hybrid/
+               ! development model) this is skipped, and staging is left to the data
+               ! regions around whichever ported sections use the field.
+               !$acc enter data create(f_cursor % array)
+#endif
              end if
              f_cursor => f_cursor % next
            end do
@@ -547,6 +701,28 @@ module mpas_field_routines
          if ( init_array ) then
          f_cursor => f
          do while(associated(f_cursor))
+#ifdef ACC_DEVICE_RESIDENT
+           ! With the field device-resident, filling it on the host would be wasted
+           ! work: nothing reads that host copy before the device copy is written, and
+           ! this loop is serial whenever OpenMP is off. The array is aliased to a local
+           ! pointer and the bounds/default value to local scalars first, because every
+           ! ported compute construct in MPAS names plain locals rather than derived-type
+           ! components: referencing f_cursor % array inside the kernel would additionally
+           ! require the field type itself to be device-resident and attached (mpas_halo.F
+           ! is the one place that needs that, and pays for it with enter data + attach).
+           arr => f_cursor % array
+           defaultVal = f_cursor % defaultValue
+           d1 = f_cursor % dimSizes(1)
+           d2 = f_cursor % dimSizes(2)
+           !$acc parallel default(present)
+           !$acc loop collapse(2)
+           do i = 1, d2
+             do j = 1, d1
+               arr(j, i) = defaultVal
+             end do
+           end do
+           !$acc end parallel
+#else
            !$omp do collapse(2) schedule(runtime)
            do i = 1, f_cursor % dimSizes(2)
              do j = 1, f_cursor % dimSizes(1)
@@ -554,6 +730,7 @@ module mpas_field_routines
              end do
            end do
            !$omp end do
+#endif
            f_cursor => f_cursor % next
          end do
          end if
@@ -600,6 +777,11 @@ module mpas_field_routines
        type (field3dReal), pointer :: f_cursor
        integer :: threadNum
        integer :: i,j,k
+#ifdef ACC_DEVICE_RESIDENT
+       real (kind=RKIND), dimension(:,:,:), pointer :: arr
+       real (kind=RKIND) :: defaultVal
+       integer :: d1, d2, d3
+#endif
 
        if(f % isPersistent) then
           return
@@ -626,6 +808,14 @@ module mpas_field_routines
            do while(associated(f_cursor))
              if(.not.associated(f_cursor % array)) then
                allocate(f_cursor % array(f_cursor % dimSizes(1), f_cursor % dimSizes(2), f_cursor % dimSizes(3)))
+#ifdef ACC_DEVICE_RESIDENT
+               ! A scratch field is device-resident for as long as its host allocation
+               ! lives, so it is created on the device here and deleted in the matching
+               ! mpas_deallocate_scratch_field. Without ACC_DEVICE_RESIDENT (the hybrid/
+               ! development model) this is skipped, and staging is left to the data
+               ! regions around whichever ported sections use the field.
+               !$acc enter data create(f_cursor % array)
+#endif
              end if
              f_cursor => f_cursor % next
            end do
@@ -636,6 +826,32 @@ module mpas_field_routines
          if ( init_array ) then
          f_cursor => f
          do while(associated(f_cursor))
+#ifdef ACC_DEVICE_RESIDENT
+           ! With the field device-resident, filling it on the host would be wasted work:
+           ! nothing reads that host copy before the device copy is overwritten, and this
+           ! loop is serial whenever OpenMP is off -- for a field the size of 'scale' that
+           ! is millions of elements per call. The array is aliased to a local pointer and
+           ! the bounds/default value to local scalars first, because every ported compute
+           ! construct in MPAS names plain locals rather than derived-type components:
+           ! referencing f_cursor % array inside the kernel would additionally require the
+           ! field type itself to be device-resident and attached (mpas_halo.F is the one
+           ! place that needs that, and it pays for it with enter data copyin + attach).
+           arr => f_cursor % array
+           defaultVal = f_cursor % defaultValue
+           d1 = f_cursor % dimSizes(1)
+           d2 = f_cursor % dimSizes(2)
+           d3 = f_cursor % dimSizes(3)
+           !$acc parallel default(present)
+           !$acc loop collapse(3)
+           do i = 1, d3
+             do j = 1, d2
+               do k = 1, d1
+                 arr(k, j, i) = defaultVal
+               end do
+             end do
+           end do
+           !$acc end parallel
+#else
            !$omp do collapse(3) schedule(runtime)
            do i = 1, f_cursor % dimSizes(3)
              do j = 1, f_cursor % dimSizes(2)
@@ -645,6 +861,7 @@ module mpas_field_routines
              end do
            end do
            !$omp end do
+#endif
            f_cursor => f_cursor % next
          end do
          end if
@@ -693,6 +910,11 @@ module mpas_field_routines
        type (field4dReal), pointer :: f_cursor
        integer :: threadNum
        integer :: i,j,k,l
+#ifdef ACC_DEVICE_RESIDENT
+       real (kind=RKIND), dimension(:,:,:,:), pointer :: arr
+       real (kind=RKIND) :: defaultVal
+       integer :: d1, d2, d3, d4
+#endif
 
        if(f % isPersistent) then
           return
@@ -719,6 +941,14 @@ module mpas_field_routines
            do while(associated(f_cursor))
              if(.not.associated(f_cursor % array)) then
                allocate(f_cursor % array(f_cursor % dimSizes(1), f_cursor % dimSizes(2), f_cursor % dimSizes(3), f_cursor % dimSizes(4)))
+#ifdef ACC_DEVICE_RESIDENT
+               ! A scratch field is device-resident for as long as its host allocation
+               ! lives, so it is created on the device here and deleted in the matching
+               ! mpas_deallocate_scratch_field. Without ACC_DEVICE_RESIDENT (the hybrid/
+               ! development model) this is skipped, and staging is left to the data
+               ! regions around whichever ported sections use the field.
+               !$acc enter data create(f_cursor % array)
+#endif
              end if
              f_cursor => f_cursor % next
            end do
@@ -729,6 +959,34 @@ module mpas_field_routines
          if ( init_array ) then
          f_cursor => f
          do while(associated(f_cursor))
+#ifdef ACC_DEVICE_RESIDENT
+           ! With the field device-resident, filling it on the host would be wasted
+           ! work: nothing reads that host copy before the device copy is written, and
+           ! this loop is serial whenever OpenMP is off. The array is aliased to a local
+           ! pointer and the bounds/default value to local scalars first, because every
+           ! ported compute construct in MPAS names plain locals rather than derived-type
+           ! components: referencing f_cursor % array inside the kernel would additionally
+           ! require the field type itself to be device-resident and attached (mpas_halo.F
+           ! is the one place that needs that, and pays for it with enter data + attach).
+           arr => f_cursor % array
+           defaultVal = f_cursor % defaultValue
+           d1 = f_cursor % dimSizes(1)
+           d2 = f_cursor % dimSizes(2)
+           d3 = f_cursor % dimSizes(3)
+           d4 = f_cursor % dimSizes(4)
+           !$acc parallel default(present)
+           !$acc loop collapse(4)
+           do i = 1, d4
+             do j = 1, d3
+               do k = 1, d2
+                 do l = 1, d1
+                   arr(l, k, j, i) = defaultVal
+                 end do
+               end do
+             end do
+           end do
+           !$acc end parallel
+#else
            !$omp do collapse(4) schedule(runtime)
            do i = 1, f_cursor % dimSizes(4)
              do j = 1, f_cursor % dimSizes(3)
@@ -740,6 +998,7 @@ module mpas_field_routines
              end do
            end do
            !$omp end do
+#endif
            f_cursor => f_cursor % next
          end do
          end if
@@ -790,6 +1049,11 @@ module mpas_field_routines
        type (field5dReal), pointer :: f_cursor
        integer :: threadNum
        integer :: i,j,k,l,m
+#ifdef ACC_DEVICE_RESIDENT
+       real (kind=RKIND), dimension(:,:,:,:,:), pointer :: arr
+       real (kind=RKIND) :: defaultVal
+       integer :: d1, d2, d3, d4, d5
+#endif
 
        if(f % isPersistent) then
           return
@@ -816,6 +1080,14 @@ module mpas_field_routines
            do while(associated(f_cursor))
              if(.not.associated(f_cursor % array)) then
                allocate(f_cursor % array(f_cursor % dimSizes(1), f_cursor % dimSizes(2), f_cursor % dimSizes(3), f_cursor % dimSizes(4), f_cursor % dimSizes(5)))
+#ifdef ACC_DEVICE_RESIDENT
+               ! A scratch field is device-resident for as long as its host allocation
+               ! lives, so it is created on the device here and deleted in the matching
+               ! mpas_deallocate_scratch_field. Without ACC_DEVICE_RESIDENT (the hybrid/
+               ! development model) this is skipped, and staging is left to the data
+               ! regions around whichever ported sections use the field.
+               !$acc enter data create(f_cursor % array)
+#endif
              end if
              f_cursor => f_cursor % next
            end do
@@ -826,6 +1098,37 @@ module mpas_field_routines
          if ( init_array ) then
          f_cursor => f
          do while(associated(f_cursor))
+#ifdef ACC_DEVICE_RESIDENT
+           ! With the field device-resident, filling it on the host would be wasted
+           ! work: nothing reads that host copy before the device copy is written, and
+           ! this loop is serial whenever OpenMP is off. The array is aliased to a local
+           ! pointer and the bounds/default value to local scalars first, because every
+           ! ported compute construct in MPAS names plain locals rather than derived-type
+           ! components: referencing f_cursor % array inside the kernel would additionally
+           ! require the field type itself to be device-resident and attached (mpas_halo.F
+           ! is the one place that needs that, and pays for it with enter data + attach).
+           arr => f_cursor % array
+           defaultVal = f_cursor % defaultValue
+           d1 = f_cursor % dimSizes(1)
+           d2 = f_cursor % dimSizes(2)
+           d3 = f_cursor % dimSizes(3)
+           d4 = f_cursor % dimSizes(4)
+           d5 = f_cursor % dimSizes(5)
+           !$acc parallel default(present)
+           !$acc loop collapse(5)
+           do i = 1, d5
+             do j = 1, d4
+               do k = 1, d3
+                 do l = 1, d2
+                   do m = 1, d1
+                     arr(m, l, k, j, i) = defaultVal
+                   end do
+                 end do
+               end do
+             end do
+           end do
+           !$acc end parallel
+#else
            !$omp do collapse(5) schedule(runtime)
            do i = 1, f_cursor % dimSizes(5)
              do j = 1, f_cursor % dimSizes(4)
@@ -839,6 +1142,7 @@ module mpas_field_routines
              end do
            end do
            !$omp end do
+#endif
            f_cursor => f_cursor % next
          end do
          end if
@@ -996,6 +1300,11 @@ module mpas_field_routines
              f_cursor => f
              do while(associated(f_cursor))
                if(associated(f_cursor % array)) then
+#ifdef ACC_DEVICE_RESIDENT
+                 ! Matches the enter data create in mpas_allocate_scratch_field: the device
+                 ! copy is removed before the host allocation it corresponds to goes away.
+                 !$acc exit data delete(f_cursor % array)
+#endif
                  deallocate(f_cursor % array)
                end if
    
@@ -1046,6 +1355,11 @@ module mpas_field_routines
              f_cursor => f
              do while(associated(f_cursor))
                if(associated(f_cursor % array)) then
+#ifdef ACC_DEVICE_RESIDENT
+                 ! Matches the enter data create in mpas_allocate_scratch_field: the device
+                 ! copy is removed before the host allocation it corresponds to goes away.
+                 !$acc exit data delete(f_cursor % array)
+#endif
                  deallocate(f_cursor % array)
                end if
    
@@ -1096,6 +1410,11 @@ module mpas_field_routines
              f_cursor => f
              do while(associated(f_cursor))
                if(associated(f_cursor % array)) then
+#ifdef ACC_DEVICE_RESIDENT
+                 ! Matches the enter data create in mpas_allocate_scratch_field: the device
+                 ! copy is removed before the host allocation it corresponds to goes away.
+                 !$acc exit data delete(f_cursor % array)
+#endif
                  deallocate(f_cursor % array)
                end if
    
@@ -1146,6 +1465,11 @@ module mpas_field_routines
              f_cursor => f
              do while(associated(f_cursor))
                if(associated(f_cursor % array)) then
+#ifdef ACC_DEVICE_RESIDENT
+                 ! Matches the enter data create in mpas_allocate_scratch_field: the device
+                 ! copy is removed before the host allocation it corresponds to goes away.
+                 !$acc exit data delete(f_cursor % array)
+#endif
                  deallocate(f_cursor % array)
                end if
    
@@ -1196,6 +1520,11 @@ module mpas_field_routines
              f_cursor => f
              do while(associated(f_cursor))
                if(associated(f_cursor % array)) then
+#ifdef ACC_DEVICE_RESIDENT
+                 ! Matches the enter data create in mpas_allocate_scratch_field: the device
+                 ! copy is removed before the host allocation it corresponds to goes away.
+                 !$acc exit data delete(f_cursor % array)
+#endif
                  deallocate(f_cursor % array)
                end if
    
@@ -1246,6 +1575,11 @@ module mpas_field_routines
              f_cursor => f
              do while(associated(f_cursor))
                if(associated(f_cursor % array)) then
+#ifdef ACC_DEVICE_RESIDENT
+                 ! Matches the enter data create in mpas_allocate_scratch_field: the device
+                 ! copy is removed before the host allocation it corresponds to goes away.
+                 !$acc exit data delete(f_cursor % array)
+#endif
                  deallocate(f_cursor % array)
                end if
    
@@ -1296,6 +1630,11 @@ module mpas_field_routines
              f_cursor => f
              do while(associated(f_cursor))
                if(associated(f_cursor % array)) then
+#ifdef ACC_DEVICE_RESIDENT
+                 ! Matches the enter data create in mpas_allocate_scratch_field: the device
+                 ! copy is removed before the host allocation it corresponds to goes away.
+                 !$acc exit data delete(f_cursor % array)
+#endif
                  deallocate(f_cursor % array)
                end if
    
@@ -1346,6 +1685,11 @@ module mpas_field_routines
              f_cursor => f
              do while(associated(f_cursor))
                if(associated(f_cursor % array)) then
+#ifdef ACC_DEVICE_RESIDENT
+                 ! Matches the enter data create in mpas_allocate_scratch_field: the device
+                 ! copy is removed before the host allocation it corresponds to goes away.
+                 !$acc exit data delete(f_cursor % array)
+#endif
                  deallocate(f_cursor % array)
                end if
    

@@ -180,6 +180,7 @@ nvhpc:   # BUILDTARGET NVIDIA HPC SDK
 	"USE_PAPI = $(USE_PAPI)" \
 	"OPENMP = $(OPENMP)" \
 	"OPENACC = $(OPENACC)" \
+	"ACC_DEVICE_RESIDENT = $(ACC_DEVICE_RESIDENT)" \
 	"MPAS_NVTX = $(MPAS_NVTX)" \
 	"GPU_MEM_MODE = $(GPU_MEM_MODE)" \
 	"NVHPC_BFB = $(NVHPC_BFB)" \
@@ -895,6 +896,17 @@ ifeq "$(OPENACC)" "true"
         CXXFLAGS += $(CFLAGS_ACC)
         override CPPFLAGS += "-DMPAS_OPENACC"
         LDFLAGS += $(FFLAGS_ACC)
+
+# ACC_DEVICE_RESIDENT selects the GPU-resident data-lifetime model: fields that
+# are used on the device stay resident for the lifetime of their host-side
+# allocation, rather than being staged in and out around each use. Code guarded
+# by this macro is what makes a field device-resident in the first place, so a
+# build without it falls back to the hybrid/development model, where data
+# regions around each ported section perform real transfers and unported host
+# code still sees correct values. Only meaningful with OPENACC=true.
+ifneq "$(ACC_DEVICE_RESIDENT)" "false"
+        override CPPFLAGS += "-DACC_DEVICE_RESIDENT"
+endif #ACC_DEVICE_RESIDENT IF
 endif #OPENACC IF
 
 # NVHPC_BFB=true keeps nvhpc GPU builds bit-for-bit reproducible against
@@ -1042,6 +1054,16 @@ ifeq "$(MPAS_NVTX)" "true"
 	NVTX_MESSAGE="MPAS was built with NVTX profiling regions enabled."
 else
 	NVTX_MESSAGE="MPAS was built without NVTX profiling regions."
+endif
+
+ifeq "$(OPENACC)" "true"
+ifneq "$(ACC_DEVICE_RESIDENT)" "false"
+	ACC_DEVICE_RESIDENT_MESSAGE="MPAS was built with the GPU-resident OpenACC data model."
+else
+	ACC_DEVICE_RESIDENT_MESSAGE="MPAS was built with the hybrid/development OpenACC data model."
+endif
+else
+	ACC_DEVICE_RESIDENT_MESSAGE="MPAS was built without OpenACC data-residency options."
 endif
 
 ifeq "$(NVHPC_BFB)" "true"
@@ -1623,6 +1645,7 @@ mpas_main: $(MAIN_DEPS)
 	@echo $(OPENMP_MESSAGE)
 	@echo $(OPENMP_OFFLOAD_MESSAGE)
 	@echo $(OPENACC_MESSAGE)
+	@echo $(ACC_DEVICE_RESIDENT_MESSAGE)
 	@echo $(NVTX_MESSAGE)
 	@echo $(NVHPC_BFB_MESSAGE)
 	@echo $(MUSICA_MESSAGE)
@@ -1689,6 +1712,7 @@ errmsg:
 	@echo "                    TIMER_LIB=tau - Uses TAU for the timer interface instead of the native interface"
 	@echo "    OPENMP=true   - builds and links with OpenMP flags. Default is to not use OpenMP."
 	@echo "    OPENACC=true  - builds and links with OpenACC flags. Default is to not use OpenACC."
+	@echo "    ACC_DEVICE_RESIDENT=false - builds the hybrid/development OpenACC data model, where data regions around each ported section perform real host/device transfers so that unported host code still sees correct values (requires OPENACC=true). Default is the GPU-resident data model, where device-used fields stay resident for the lifetime of their host-side allocation."
 	@echo "    MPAS_NVTX=true - instruments all MPAS timers with NVTX profiling regions (requires nvhpc). Default is to not use NVTX."
 	@echo "    GPU_MEM_MODE=<separate|managed|unified>[:suboption[:suboption...]] - selects the OpenACC GPU memory model via -gpu=mem:<...> (requires nvhpc), e.g. GPU_MEM_MODE=unified:managedalloc maps to -gpu=mem:unified:managedalloc. Default is unset, which leaves -gpu=mem:... off (nvhpc default of separate host/device memory)."
 	@echo "    NVHPC_BFB=true - adds -Mnofma (CPU/GPU) and -gpu=math_uniform (GPU) so nvhpc GPU builds are bit-for-bit reproducible against nvhpc CPU builds (requires nvhpc). Default is off."
