@@ -583,7 +583,7 @@ module atm_time_integration
       real(kind=RKIND), dimension(:,:), pointer :: tend_w_pgf, tend_w_buoy
       real(kind=RKIND), dimension(:,:,:), pointer :: scalar_tend_save
 
-      real (kind=RKIND), dimension(:,:), pointer :: rthdynten, divergence, vorticity
+      real (kind=RKIND), dimension(:,:), pointer :: rthdynten, rqvdynten, divergence, vorticity
 
       real (kind=RKIND), dimension(:,:), pointer :: lbc_u, lbc_w, lbc_ru, lbc_rho_edge, lbc_rho, lbc_rtheta_m, lbc_rho_zz, lbc_theta
       real (kind=RKIND), dimension(:,:), pointer :: lbc_tend_u, lbc_tend_w, lbc_tend_ru, lbc_tend_rho_edge, lbc_tend_rho
@@ -810,6 +810,8 @@ module atm_time_integration
 
       call mpas_pool_get_array(tend_physics, 'rthdynten', rthdynten)
       !$acc enter data copyin(rthdynten)
+      call mpas_pool_get_array(tend_physics, 'rqvdynten', rqvdynten)
+      !$acc enter data copyin(rqvdynten)
 
       MPAS_ACC_TIMER_STOP('mpas_atm_dynamics_state_init [ACC_data_xfer]')
 #endif
@@ -2697,28 +2699,26 @@ module atm_time_integration
       !
 
 #ifdef DO_PHYSICS
-      MPAS_ACC_TIMER_START('atm_srk3: physics ACC_data_xfer')
       call mpas_pool_get_array(state, 'scalars', scalars_1, 1)
-      !$acc update self(scalars_1)
       call mpas_pool_get_array(state, 'scalars', scalars_2, 2)
-      !$acc update self(scalars_2)
-      MPAS_ACC_TIMER_STOP('atm_srk3: physics ACC_data_xfer')
 
       if(config_convection_scheme == 'cu_grell_freitas' .or. &
          config_convection_scheme == 'cu_ntiedtke') then
 
-         MPAS_ACC_TIMER_START('atm_srk3: physics ACC_data_xfer')
-         call mpas_pool_get_array(tend_physics, 'rqvdynten', rqvdynten)
+         ! scalars_1/scalars_2/theta_m/rthdynten are all persistently device-resident (see
+         ! mpas_atm_dynamics_state_init), but this block is genuine host-only computation that
+         ! reads and rewrites rthdynten, so it needs real content synchronization -- a
+         ! data/enter-exit-data region would only bump the already-outstanding reference count
+         ! and not actually transfer anything. Gated inside this if so it costs nothing when
+         ! this scheme isn't selected, matching config_convection_scheme for this test case.
          call mpas_pool_get_array(state, 'theta_m', theta_m, 2)
-         !$acc update self(theta_m)
-
          call mpas_pool_get_array(tend_physics, 'rthdynten', rthdynten)
-         !$acc update self(rthdynten)
-         MPAS_ACC_TIMER_STOP('atm_srk3: physics ACC_data_xfer')
+         call mpas_pool_get_array(tend_physics, 'rqvdynten', rqvdynten)
+         !$acc update self(scalars_1, scalars_2, theta_m, rthdynten)
 
          !NOTE: The calculation of the tendency due to horizontal and vertical advection for the water vapor mixing ratio
          !requires that the subroutine atm_advance_scalars_mono was called on the third Runge Kutta step, so that a halo
-         !update for the scalars at time_levs(1) is applied. A halo update for the scalars at time_levs(2) is done above. 
+         !update for the scalars at time_levs(1) is applied. A halo update for the scalars at time_levs(2) is done above.
          if (config_monotonic) then
             rqvdynten(:,:) = ( scalars_2(index_qv,:,:) - scalars_1(index_qv,:,:) ) / dt
          else
@@ -2733,15 +2733,24 @@ module atm_time_integration
             end do
          end do
 
+         !$acc update device(rthdynten)
+
       end if
 
-      !simply set to zero negative mixing ratios of different water species (for now):
-      where ( scalars_2(:,:,:) < 0.0)  &
-         scalars_2(:,:,:) = 0.0
+      !simply set to zero negative mixing ratios of different water species (for now). This runs
+      !unconditionally, so it is ported to run directly against the device-resident scalars_2
+      !rather than requiring a host round-trip:
+      !$acc parallel default(present)
+      !$acc loop collapse(3)
+      do iCell = 1, nCells+1
+      do k = 1, nVertLevels
+      do iScalar = 1, num_scalars
+         if (scalars_2(iScalar,k,iCell) < 0.0_RKIND) scalars_2(iScalar,k,iCell) = 0.0_RKIND
+      end do
+      end do
+      end do
+      !$acc end parallel
 
-      MPAS_ACC_TIMER_START('atm_srk3: physics ACC_data_xfer')
-      !$acc update device(scalars_2, rthdynten)
-      MPAS_ACC_TIMER_STOP('atm_srk3: physics ACC_data_xfer')
       !call microphysics schemes:
       if (trim(config_microp_scheme) /= 'off')  then
         call pre_microphysics( block % configs, state, diag, 2)
