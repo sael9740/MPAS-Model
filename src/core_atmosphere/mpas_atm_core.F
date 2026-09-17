@@ -30,7 +30,7 @@ module atm_core
       use mpas_atm_dimensions, only : mpas_atm_set_dims
       use mpas_atm_diagnostics_manager, only : mpas_atm_diag_setup
       use mpas_atm_threading, only : mpas_atm_threading_init
-      use atm_time_integration, only : mpas_atm_dynamics_init, &
+      use atm_time_integration, only : mpas_atm_dynamics_init, mpas_atm_dynamics_state_init, &
                               mpas_atm_pre_dynamics, mpas_atm_post_dynamics
       use mpas_timer, only : mpas_timer_start, mpas_timer_stop
       use mpas_attlist, only : mpas_modify_att
@@ -285,6 +285,13 @@ module atm_core
       ! Prepare the dynamics for integration
       !
       call mpas_atm_dynamics_init(domain)
+
+      !
+      ! Temporary, test-case-scoped step toward GPU-resident dynamics state (see
+      ! mpas_atm_dynamics_state_init): stage the dynamics state/diag/tend/lbc field set
+      ! onto the device once, here, instead of every timestep in mpas_atm_pre_dynamics.
+      !
+      call mpas_atm_dynamics_state_init(domain)
 
       !
       ! Initialize the chemistry package
