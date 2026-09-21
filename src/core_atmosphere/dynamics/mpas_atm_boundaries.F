@@ -677,6 +677,7 @@ module mpas_atm_boundaries
         real (kind=RKIND) :: d, dmin
 
         integer, pointer :: nCells
+        integer :: nCells_acc
         integer, dimension(:), pointer :: bdyMaskCell, bdyMaskEdge, bdyMaskVertex
         integer, dimension(:), pointer :: nearestRelaxationCell
         integer, dimension(:), pointer :: nEdgesOnCell
@@ -685,6 +686,8 @@ module mpas_atm_boundaries
         real (kind=RKIND), dimension(:), pointer :: xCell, yCell, zCell
 
         call mpas_pool_get_dimension(mesh, 'nCells', nCells)
+
+        nCells_acc = nCells
 
         call mpas_pool_get_array(mesh, 'bdyMaskCell', bdyMaskCell)
         call mpas_pool_get_array(mesh, 'bdyMaskEdge', bdyMaskEdge)
@@ -704,20 +707,27 @@ module mpas_atm_boundaries
         ! NB: The specZoneMask{Cell,Edge,Vertex} fields receive a default value of 0.0 from the Registry,
         !     so no need to initialize them here
         !
+        !$acc kernels
         where (bdyMaskCell(:) > nRelaxZone) specZoneMaskCell(:) = 1.0_RKIND
         where (bdyMaskEdge(:) > nRelaxZone) specZoneMaskEdge(:) = 1.0_RKIND
         where (bdyMaskVertex(:) > nRelaxZone) specZoneMaskVertex(:) = 1.0_RKIND
+        !$acc end kernels
 
 
+        !$acc kernels
         nearestRelaxationCell(:) = nCells+1
+        !$acc end kernels
 
         !
         ! For nearest relaxation cell to inner specified zone, just search
         ! all cellsOnCell with bdyMaskCell == nRelaxZone
         !
-        do iCell=1,nCells
+        !$acc parallel
+        !$acc loop gang vector
+        do iCell=1,nCells_acc
             if (bdyMaskCell(iCell) == (nRelaxZone+1)) then
                 dmin = 1.0e36
+                !$acc loop seq
                 do j=1,nEdgesOnCell(iCell)
                     i = cellsOnCell(j,iCell)
                     if (bdyMaskCell(i) == nRelaxZone) then
@@ -730,18 +740,23 @@ module mpas_atm_boundaries
                 end do
             end if
         end do
+        !$acc end parallel
 
         !
         ! For nearest relaxation cell to outer specified zone, search
         ! all cellsOnCell of cellsOnCell
         !
-        do iCell=1,nCells
+        !$acc parallel
+        !$acc loop gang vector
+        do iCell=1,nCells_acc
             if (bdyMaskCell(iCell) == (nRelaxZone+2)) then
                 dmin = 1.0e36
+                !$acc loop seq
                 do j=1,nEdgesOnCell(iCell)
                     i = cellsOnCell(j,iCell)
                     if (bdyMaskCell(i) == (nRelaxZone+1)) then
 
+                        !$acc loop seq
                         do jj=1,nEdgesOnCell(i)
                             ii = cellsOnCell(jj,i)
                             if (bdyMaskCell(ii) == nRelaxZone) then
@@ -759,6 +774,7 @@ module mpas_atm_boundaries
                 end do
             end if
         end do
+        !$acc end parallel
 
     end subroutine mpas_atm_setup_bdy_masks
 
