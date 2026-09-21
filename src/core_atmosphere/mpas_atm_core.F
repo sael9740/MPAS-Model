@@ -377,6 +377,7 @@ module atm_core
       use mpas_vector_reconstruction
       use mpas_stream_manager
       use mpas_atm_boundaries, only : mpas_atm_setup_bdy_masks
+      use mpas_timer, only : mpas_timer_start, mpas_timer_stop
 #ifdef DO_PHYSICS
 !     use mpas_atmphys_aquaplanet
       use mpas_atmphys_control
@@ -561,7 +562,10 @@ module atm_core
       deallocate(ke_edge)
 
       call mpas_rbf_interp_initialize(mesh)
+
+      call mpas_timer_start('mpas_init_reconstruct')
       call mpas_init_reconstruct(mesh)
+      call mpas_timer_stop('mpas_init_reconstruct')
 
       ! coeffs_reconstruct is computed on the host: mpas_init_reconstruct
       ! allocates and deallocates work arrays once per cell and calls into
