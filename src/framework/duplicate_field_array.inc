@@ -68,7 +68,33 @@
                end do
             end if
             if ( dst_cursor % isActive .and. src_cursor % isActive ) then
+               ! Copy on the device, so this is correct wherever the valid data lives. The
+               ! cursor types are staged and the array members explicitly copied in because
+               ! referencing a pointer member inside a compute construct requires the
+               ! containing type to be present and the member attached; relying on the
+               ! compiler's implicit data region instead is correct only while the arrays are
+               ! NOT resident, and silently reads host addresses once they are.
+               ! The destination is created rather than copied in: the assignment overwrites
+               ! it whole, so its prior contents need not be transferred. The source is copied
+               ! in because it is read.
+               !$acc enter data create(src_cursor, dst_cursor)
+               !$acc enter data copyin(src_cursor % array)
+               !$acc enter data create(dst_cursor % array)
+               !$acc kernels
                dst_cursor % array = src_cursor % array
+               !$acc end kernels
+               ! copyout/delete mirror the clauses above and restore the prior residency state
+               ! exactly, because both decrement the reference count rather than acting
+               ! unconditionally. If the arrays were not resident, the result is written back to
+               ! the host and the device copies are released. If they were already resident, the
+               ! count merely returns to what it was: no transfer, nothing freed, and the result
+               ! stays on the device where the valid copy lives. Leaving a reference behind here
+               ! would be silently destructive -- a later enter data copyin of the same field
+               ! would find it present and become a no-op, so host values computed after this
+               ! point would never reach the device.
+               !$acc exit data copyout(dst_cursor % array)
+               !$acc exit data delete(src_cursor % array)
+               !$acc exit data delete(src_cursor, dst_cursor)
             end if
 
 !           src_cursor => src_cursor % next
