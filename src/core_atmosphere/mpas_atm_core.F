@@ -1321,6 +1321,7 @@ module atm_core
 
       integer :: iCell, k
       integer, pointer :: nCells, nVertLevels
+      integer :: nCells_acc, nVertLevels_acc
       real (kind=RKIND), pointer :: config_xnutr, config_zd
       real (kind=RKIND) :: z, zt, m1, pii
       real (kind=RKIND), dimension(:,:), pointer :: dss, zgrid
@@ -1336,22 +1337,31 @@ module atm_core
       call mpas_pool_get_dimension(mesh, 'nCells', nCells)
       call mpas_pool_get_dimension(mesh, 'nVertLevels', nVertLevels)
 
+      nCells_acc = nCells
+      nVertLevels_acc = nVertLevels
+
       call mpas_pool_get_array(mesh, 'dss', dss)
       call mpas_pool_get_array(mesh, 'zgrid', zgrid)
 
       call mpas_pool_get_config(configs, 'config_zd', config_zd)
       call mpas_pool_get_config(configs, 'config_xnutr', config_xnutr)
 
+      !$acc kernels
       dss(:,:) = 0.0
-      do iCell=1,nCells
-         zt = zgrid(nVertLevels+1,iCell)
-         do k=1,nVertLevels
+      !$acc end kernels
+      !$acc parallel
+      !$acc loop gang worker
+      do iCell=1,nCells_acc
+         zt = zgrid(nVertLevels_acc+1,iCell)
+         !$acc loop vector
+         do k=1,nVertLevels_acc
             z = 0.5*(zgrid(k,iCell) + zgrid(k+1,iCell))
             if (z > config_zd) then
                dss(k,iCell) = config_xnutr*sin(0.5*pii*(z-config_zd)/(zt-config_zd))**2.0
             end if
          end do
       end do
+      !$acc end parallel
 
       call mpas_pool_get_array(mesh, 'rdzw', rdzw)
       call mpas_pool_get_array(mesh, 'etp', etp)
@@ -1373,6 +1383,13 @@ module atm_core
 ! initialization for heights of coordinate at u and w levels  
 ! These are the heights of the computational coordinate zeta
       
+      ! The epssm profiles below stay on the host: they are vertical-only
+      ! (nVertLevels), the height_w_levels loop is a sequential recurrence, and both
+      ! coefficient loops carry MPAS_DEBUG logging. Sync either side so this remains
+      ! correct once these fields are device-resident, where the device copy is the
+      ! valid one.
+      !$acc update self(rdzw) if_present
+
       height_w_levels(:) = 0.0_RKIND
       do k =1, nVertLevels
         height_w_levels(k+1) = height_w_levels(k) + 1.0_RKIND/rdzw(k)
@@ -1420,6 +1437,8 @@ module atm_core
          call mpas_log_write('k, ewp, ewm $i $r $r ',intArgs=(/k/),realArgs=(/ewp(k),ewm(k)/))
 #endif
       end do
+
+      !$acc update device(etp, etm, ewp, ewm) if_present
 
       deallocate(height_u_levels)
       deallocate(epssm_coeff_u)
