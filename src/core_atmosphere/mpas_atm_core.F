@@ -1230,6 +1230,8 @@ module atm_core
 
       integer :: i, j, iCell, iVtx
       integer, pointer :: nCells, nVertices, nEdges, vertexDegree
+      integer :: nCells_acc, nVertices_acc, nEdges_acc, vertexDegree_acc
+      logical :: kiteForCell_error
       integer, dimension(:), pointer :: nEdgesOnCell
       integer, dimension(:,:), pointer :: edgesOnVertex, verticesOnEdge, cellsOnEdge, edgesOnCell
       integer, dimension(:,:), pointer :: verticesOnCell, cellsOnVertex, kiteForCell
@@ -1257,10 +1259,18 @@ module atm_core
       call mpas_pool_get_dimension(mesh, 'nEdges', nEdges)
       call mpas_pool_get_dimension(mesh, 'vertexDegree', vertexDegree)
 
+      nCells_acc = nCells
+      nVertices_acc = nVertices
+      nEdges_acc = nEdges
+      vertexDegree_acc = vertexDegree
 
-      do iVtx=1,nVertices
-         do i=1,vertexDegree
-            if (edgesOnVertex(i,iVtx) <= nEdges) then
+
+      !$acc parallel
+      !$acc loop gang worker
+      do iVtx=1,nVertices_acc
+         !$acc loop vector
+         do i=1,vertexDegree_acc
+            if (edgesOnVertex(i,iVtx) <= nEdges_acc) then
                if (iVtx == verticesOnEdge(2,edgesOnVertex(i,iVtx))) then
                   edgesOnVertex_sign(i,iVtx) = 1.0
                else
@@ -1271,10 +1281,14 @@ module atm_core
             end if
          end do
       end do
+      !$acc end parallel
 
-      do iCell=1,nCells
+      !$acc parallel
+      !$acc loop gang worker
+      do iCell=1,nCells_acc
+         !$acc loop vector
          do i=1,nEdgesOnCell(iCell)
-            if (edgesOnCell(i,iCell) <= nEdges) then
+            if (edgesOnCell(i,iCell) <= nEdges_acc) then
                if (iCell == cellsOnEdge(1,edgesOnCell(i,iCell))) then
                   edgesOnCell_sign(i,iCell) = 1.0
                   zb_cell(:,i,iCell) = zb(:,1,edgesOnCell(i,iCell))
@@ -1289,25 +1303,37 @@ module atm_core
             end if
          end do
       end do
+      !$acc end parallel
 
-      do iCell=1,nCells
+      kiteForCell_error = .false.
+
+      !$acc parallel
+      !$acc loop gang worker reduction(.or.:kiteForCell_error)
+      do iCell=1,nCells_acc
+         !$acc loop vector reduction(.or.:kiteForCell_error)
          do i=1,nEdgesOnCell(iCell)
             iVtx = verticesOnCell(i,iCell)
-            if (iVtx <= nVertices) then
-               do j=1,vertexDegree
+            if (iVtx <= nVertices_acc) then
+               !$acc loop seq
+               do j=1,vertexDegree_acc
                   if (iCell == cellsOnVertex(j,iVtx)) then
                      kiteForCell(i,iCell) = j
                      exit
                   end if
                end do
-               if (j > vertexDegree) then
-                  call mpas_log_write('Unexpected error while identifying kiteForCell', messageType=MPAS_LOG_ERR)
+               if (j > vertexDegree_acc) then
+                  kiteForCell_error = .true.
                end if
             else
                kiteForCell(i,iCell) = 1
             end if
          end do
       end do
+      !$acc end parallel
+
+      if (kiteForCell_error) then
+         call mpas_log_write('Unexpected error while identifying kiteForCell', messageType=MPAS_LOG_ERR)
+      end if
 
    end subroutine atm_compute_signs
 
