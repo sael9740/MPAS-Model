@@ -406,6 +406,7 @@ module atm_core
       integer :: iCell,iEdge,iVertex,k
       
       real (kind=RKIND), dimension(:,:), pointer :: u, uReconstructX, uReconstructY, uReconstructZ, uReconstructZonal, uReconstructMeridional
+      real (kind=RKIND), dimension(:,:,:), pointer :: coeffs_reconstruct
       real (kind=RKIND), dimension(:), pointer :: meshScalingDel2, meshScalingDel4
       real (kind=RKIND), dimension(:), pointer :: areaCell, invAreaCell
       real (kind=RKIND), dimension(:), pointer :: dvEdge, invDvEdge
@@ -561,6 +562,16 @@ module atm_core
 
       call mpas_rbf_interp_initialize(mesh)
       call mpas_init_reconstruct(mesh)
+
+      ! coeffs_reconstruct is computed on the host: mpas_init_reconstruct
+      ! allocates and deallocates work arrays once per cell and calls into
+      ! mpas_rbf_interpolation, whose RBF fit bottoms out in a dense Gaussian
+      ! elimination using automatic arrays sized by a runtime argument. Porting
+      ! it would mean restructuring operator code shared by every MPAS core, so
+      ! republish the result here instead, keeping the sync in the atmosphere
+      ! core rather than in the shared operator.
+      call mpas_pool_get_array(mesh, 'coeffs_reconstruct', coeffs_reconstruct)
+      !$acc update device(coeffs_reconstruct) if_present
 
       call mpas_pool_get_array(state, 'u', u, 1)
       call mpas_pool_get_array(diag, 'uReconstructX', uReconstructX)
