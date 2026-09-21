@@ -28,6 +28,8 @@ module mpas_geometry_utils
 
       implicit none
 
+      !$acc routine seq
+
       real (kind=RKIND), intent(in) :: ax, ay, az, bx, by, bz, cx, cy, cz
 
       real (kind=RKIND) :: a, b, c          ! Side lengths of spherical triangle ABC
@@ -82,6 +84,8 @@ module mpas_geometry_utils
 
       implicit none
 
+      !$acc routine seq
+
       real (kind=RKIND), intent(in) :: ax, ay, az, bx, by, bz, cx, cy, cz, u, v, w
 
       real (kind=RKIND) :: ABx, ABy, ABz    ! The components of the vector AB
@@ -131,6 +135,8 @@ module mpas_geometry_utils
    real (kind=RKIND) function mpas_arc_length(ax, ay, az, bx, by, bz)!{{{
 
       implicit none
+
+      !$acc routine seq
 
       real (kind=RKIND), intent(in) :: ax, ay, az, bx, by, bz
 
