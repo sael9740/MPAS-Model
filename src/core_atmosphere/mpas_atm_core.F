@@ -1593,8 +1593,10 @@ module atm_core
 
       call mpas_pool_get_config(configs, 'config_coef_3rd_order', config_coef_3rd_order)
 
+      !$acc kernels
       adv_coefs_3rd(:,:) = config_coef_3rd_order * adv_coefs_3rd(:,:)
       zb3_cell(:,:,:) = config_coef_3rd_order * zb3_cell(:,:,:)
+      !$acc end kernels
 
    end subroutine atm_couple_coef_3rd_order
 
