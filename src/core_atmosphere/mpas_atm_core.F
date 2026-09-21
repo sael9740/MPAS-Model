@@ -1489,6 +1489,7 @@ module atm_core
 
       integer :: cell1, cell2, iEdge, n, i, j, j_in, iCell
       integer, pointer :: nCells, nEdges
+      integer :: nCells_acc, nEdges_acc
       integer :: cell_list(20)
       logical :: addcell
 
@@ -1507,20 +1508,26 @@ module atm_core
       call mpas_pool_get_dimension(mesh, 'nCells', nCells)
       call mpas_pool_get_dimension(mesh, 'nEdges', nEdges)
 
-      do iEdge = 1, nEdges
+      nCells_acc = nCells
+      nEdges_acc = nEdges
+
+      !$acc parallel
+      !$acc loop gang vector private(cell_list)
+      do iEdge = 1, nEdges_acc
          nAdvCellsForEdge(iEdge) = 0
          cell1 = cellsOnEdge(1,iEdge)
          cell2 = cellsOnEdge(2,iEdge)
          !
          ! do only if this edge flux is needed to update owned cells
          !
-         if (cell1 <= nCells .or. cell2 <= nCells) then
+         if (cell1 <= nCells_acc .or. cell2 <= nCells_acc) then
  
             cell_list(1) = cell1
             cell_list(2) = cell2
             n = 2 
   
           !  add cells surrounding cell 1.  n is number of cells currently in list
+            !$acc loop seq
             do i = 1, nEdgesOnCell(cell1)
                if (cellsOnCell(i,cell1) /= cell2) then
                   n = n + 1
@@ -1529,8 +1536,10 @@ module atm_core
             end do
   
           !  add cells surrounding cell 2 (brute force approach)
+            !$acc loop seq
             do iCell = 1, nEdgesOnCell(cell2)
                addcell = .true.
+               !$acc loop seq
                do i=1,n
                   if (cell_list(i) == cellsOnCell(iCell,cell2)) addcell = .false.
                end do
@@ -1542,6 +1551,7 @@ module atm_core
   
   
             nAdvCellsForEdge(iEdge) = n
+            !$acc loop seq
             do iCell = 1, nAdvCellsForEdge(iEdge)
                advCellsForEdge(iCell,iEdge) = cell_list(iCell)
             end do
@@ -1555,14 +1565,17 @@ module atm_core
           ! first from cell1
   
             j_in = 0
+            !$acc loop seq
             do j=1, n
                if( cell_list(j) == cell1 ) j_in = j
             end do
             adv_coefs    (j_in,iEdge) = adv_coefs    (j_in,iEdge) + deriv_two(1,1,iEdge)
             adv_coefs_3rd(j_in,iEdge) = adv_coefs_3rd(j_in,iEdge) + deriv_two(1,1,iEdge)
   
+            !$acc loop seq
             do iCell = 1, nEdgesOnCell(cell1)
                j_in = 0
+               !$acc loop seq
                do j=1, n
                  if( cell_list(j) == cellsOnCell(iCell,cell1) ) j_in = j
                end do
@@ -1574,14 +1587,17 @@ module atm_core
           ! now from cell2
   
             j_in = 0
+            !$acc loop seq
             do j=1, n
                if( cell_list(j) == cell2 ) j_in = j
             end do
             adv_coefs    (j_in,iEdge) = adv_coefs    (j_in,iEdge) + deriv_two(1,2,iEdge)
             adv_coefs_3rd(j_in,iEdge) = adv_coefs_3rd(j_in,iEdge) - deriv_two(1,2,iEdge)
   
+            !$acc loop seq
             do iCell = 1, nEdgesOnCell(cell2)
                j_in = 0
+               !$acc loop seq
                do j=1, n
                   if( cell_list(j) == cellsOnCell(iCell,cell2) ) j_in = j
                end do
@@ -1589,6 +1605,7 @@ module atm_core
                adv_coefs_3rd(j_in,iEdge) = adv_coefs_3rd(j_in,iEdge) - deriv_two(iCell+1,2,iEdge)
             end do
   
+            !$acc loop seq
             do j = 1,n
                adv_coefs    (j,iEdge) = - (dcEdge(iEdge) **2) * adv_coefs    (j,iEdge) / 12.
                adv_coefs_3rd(j,iEdge) = - (dcEdge(iEdge) **2) * adv_coefs_3rd(j,iEdge) / 12.
@@ -1597,12 +1614,14 @@ module atm_core
           ! 2nd order centered contribution - place this in the main flux weights
   
             j_in = 0
+            !$acc loop seq
             do j=1, n
                if( cell_list(j) == cell1 ) j_in = j
             end do
             adv_coefs(j_in,iEdge) = adv_coefs(j_in,iEdge) + 0.5
   
             j_in = 0
+            !$acc loop seq
             do j=1, n
                if( cell_list(j) == cell2 ) j_in = j
             end do
@@ -1610,6 +1629,7 @@ module atm_core
   
           !  multiply by edge length - thus the flux is just dt*ru times the results of the vector-vector multiply
   
+            !$acc loop seq
             do j=1,n
                adv_coefs    (j,iEdge) = dvEdge(iEdge) * adv_coefs    (j,iEdge)
                adv_coefs_3rd(j,iEdge) = dvEdge(iEdge) * adv_coefs_3rd(j,iEdge)
@@ -1618,6 +1638,7 @@ module atm_core
          end if  ! only do for edges of owned-cells
          
       end do ! end loop over edges
+      !$acc end parallel
 
    end subroutine atm_adv_coef_compression
 
