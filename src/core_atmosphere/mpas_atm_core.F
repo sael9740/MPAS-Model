@@ -1154,6 +1154,7 @@ module atm_core
 
       integer :: iCell,iEdge, cell1, cell2
       integer, pointer :: nEdges, nCells
+      integer :: nEdges_acc, nCells_acc
       integer, dimension(:,:), pointer :: cellsOnEdge
       real (kind=RKIND), dimension(:), pointer :: meshDensity, meshScalingDel2, meshScalingDel4
       real (kind=RKIND), dimension(:), pointer :: meshScalingRegionalCell, meshScalingRegionalEdge
@@ -1169,37 +1170,53 @@ module atm_core
       call mpas_pool_get_dimension(mesh, 'nEdges', nEdges)
       call mpas_pool_get_dimension(mesh, 'nCells', nCells)
 
+      nEdges_acc = nEdges
+      nCells_acc = nCells
+
       call mpas_pool_get_config(configs, 'config_h_ScaleWithMesh', config_h_ScaleWithMesh)
 
       !
       ! Compute the scaling factors to be used in the del2 and del4 dissipation
       !
+      !$acc kernels
       meshScalingDel2(:) = 1.0
       meshScalingDel4(:) = 1.0
+      !$acc end kernels
       if (config_h_ScaleWithMesh) then
-         do iEdge=1,nEdges
+         !$acc parallel
+         !$acc loop gang vector
+         do iEdge=1,nEdges_acc
             cell1 = cellsOnEdge(1,iEdge)
             cell2 = cellsOnEdge(2,iEdge)
             meshScalingDel2(iEdge) = 1.0 / ( (meshDensity(cell1) + meshDensity(cell2) )/2.0)**0.25
             meshScalingDel4(iEdge) = 1.0 / ( (meshDensity(cell1) + meshDensity(cell2) )/2.0)**0.75
          end do
+         !$acc end parallel
       end if
 
       !
       ! Compute the scaling factors to be used in relaxation zone of regional configuration
       !
+      !$acc kernels
       meshScalingRegionalCell(:) = 1.0
       meshScalingRegionalEdge(:) = 1.0
+      !$acc end kernels
       if (config_h_ScaleWithMesh) then
-         do iEdge=1,nEdges
+         !$acc parallel
+         !$acc loop gang vector
+         do iEdge=1,nEdges_acc
             cell1 = cellsOnEdge(1,iEdge)
             cell2 = cellsOnEdge(2,iEdge)
             meshScalingRegionalEdge(iEdge) = 1.0 / ( (meshDensity(cell1) + meshDensity(cell2) )/2.0)**0.25
          end do
+         !$acc end parallel
 
-         do iCell=1,nCells
+         !$acc parallel
+         !$acc loop gang vector
+         do iCell=1,nCells_acc
             meshScalingRegionalCell(iCell) = 1.0 / (meshDensity(iCell))**0.25
          end do
+         !$acc end parallel
       end if
 
    end subroutine atm_compute_mesh_scaling
