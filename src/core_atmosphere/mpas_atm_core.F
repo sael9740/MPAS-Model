@@ -463,21 +463,33 @@ module atm_core
       nEdges = nEdges_ptr
       nVertices = nVertices_ptr
  
+      !$acc parallel
+      !$acc loop gang vector
       do iCell=1,nCells 
          invAreaCell(iCell) = 1.0_RKIND / areaCell(iCell)
       end do
+      !$acc end parallel
         
+      !$acc parallel
+      !$acc loop gang vector
       do iEdge=1,nEdges 
          invDvEdge(iEdge) = 1.0_RKIND / dvEdge(iEdge)
       end do
+      !$acc end parallel
       
+      !$acc parallel
+      !$acc loop gang vector
       do iEdge=1,nEdges 
          invDcEdge(iEdge) = 1.0_RKIND / dcEdge(iEdge)
       end do
+      !$acc end parallel
       
+      !$acc parallel
+      !$acc loop gang vector
       do iVertex=1,nVertices
          invAreaTriangle(iVertex) = 1.0_RKIND / areaTriangle(iVertex)
       end do
+      !$acc end parallel
       
       !!!!! End compute inverses
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
