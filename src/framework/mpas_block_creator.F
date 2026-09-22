@@ -34,6 +34,7 @@ module mpas_block_creator
    use mpas_field_routines
    use mpas_pool_routines
    use mpas_log
+   use mpas_timer, only : mpas_timer_start, mpas_timer_stop
 
    contains
 
@@ -1281,7 +1282,9 @@ module mpas_block_creator
        call mpas_log_write('Allocating fields ...')
        allocated_bytes = 0_I8KIND
 
+       call mpas_timer_start('allocate_pool_fields')
        call mpas_block_creator_allocate_pool_fields(block_ptr % structs, block_ptr % dimensions, allocated_bytes, ierr)
+       call mpas_timer_stop('allocate_pool_fields')
        if (ierr /= 0) then
           call mpas_log_write('Allocation of fields failed for core ' // trim(block_ptr % domain % core % coreName), MPAS_LOG_CRIT)
        end if
@@ -1587,6 +1590,7 @@ module mpas_block_creator
       type (field3DInteger), pointer :: int3DField
       type (field1DChar), pointer :: char1DField
 
+
       integer :: timeLev, iDim
       integer, pointer :: tempDim
       integer, dimension(:), pointer :: tempDim1D
@@ -1651,9 +1655,8 @@ module mpas_block_creator
 #endif
                            allocated_bytes = allocated_bytes + field_bytes
                            REPORT_TOTAL_ALLOCATION(allocated_bytes)
-                           !$acc kernels
                            real1DField % array(:) = real1DField % defaultValue
-                           !$acc end kernels
+                           !$acc update device(real1DField % array) if_present
                         end if
                      end if
                   end do
@@ -1687,9 +1690,8 @@ module mpas_block_creator
 #endif
                            allocated_bytes = allocated_bytes + field_bytes
                            REPORT_TOTAL_ALLOCATION(allocated_bytes)
-                           !$acc kernels
                            real2DField % array(:,:) = real2DField % defaultValue
-                           !$acc end kernels
+                           !$acc update device(real2DField % array) if_present
                         end if
                      end if
                   end do
@@ -1725,9 +1727,8 @@ module mpas_block_creator
 #endif
                            allocated_bytes = allocated_bytes + field_bytes
                            REPORT_TOTAL_ALLOCATION(allocated_bytes)
-                           !$acc kernels
                            real3DField % array(:,:,:) = real3DField % defaultValue
-                           !$acc end kernels
+                           !$acc update device(real3DField % array) if_present
                         end if
                      end if
                   end do
@@ -1765,9 +1766,8 @@ module mpas_block_creator
 #endif
                            allocated_bytes = allocated_bytes + field_bytes
                            REPORT_TOTAL_ALLOCATION(allocated_bytes)
-                           !$acc kernels
                            real4DField % array(:,:,:,:) = real4DField % defaultValue
-                           !$acc end kernels
+                           !$acc update device(real4DField % array) if_present
                         end if
                      end if
                   end do
@@ -1806,9 +1806,8 @@ module mpas_block_creator
 #endif
                            allocated_bytes = allocated_bytes + field_bytes
                            REPORT_TOTAL_ALLOCATION(allocated_bytes)
-                           !$acc kernels
                            real5DField % array(:,:,:,:,:) = real5DField % defaultValue
-                           !$acc end kernels
+                           !$acc update device(real5DField % array) if_present
                         end if
                      end if
                   end do
@@ -1842,9 +1841,8 @@ module mpas_block_creator
 #endif
                            allocated_bytes = allocated_bytes + field_bytes
                            REPORT_TOTAL_ALLOCATION(allocated_bytes)
-                           !$acc kernels
                            int1DField % array(:) = int1DField % defaultValue
-                           !$acc end kernels
+                           !$acc update device(int1DField % array) if_present
                         end if
                      end if
                   end do
@@ -1878,9 +1876,8 @@ module mpas_block_creator
 #endif
                            allocated_bytes = allocated_bytes + field_bytes
                            REPORT_TOTAL_ALLOCATION(allocated_bytes)
-                           !$acc kernels
                            int2DField % array(:,:) = int2DField % defaultValue
-                           !$acc end kernels
+                           !$acc update device(int2DField % array) if_present
                         end if
                      end if
                   end do
@@ -1916,9 +1913,8 @@ module mpas_block_creator
 #endif
                            allocated_bytes = allocated_bytes + field_bytes
                            REPORT_TOTAL_ALLOCATION(allocated_bytes)
-                           !$acc kernels
                            int3DField % array(:,:,:) = int3DField % defaultValue
-                           !$acc end kernels
+                           !$acc update device(int3DField % array) if_present
                         end if
                      end if
                   end do

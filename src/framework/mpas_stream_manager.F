@@ -3235,9 +3235,11 @@ module mpas_stream_manager
                ! Build stream from pools of fields and attributes
                !
                allocate(stream % stream)
+               call mpas_timer_start('createStream')
                call MPAS_createStream(stream % stream, manager % ioContext, stream % filename, stream % io_type, MPAS_IO_WRITE,  &
                                       precision=stream % precision, clobberRecords=clobberRecords, &
                                       clobberFiles=clobberFiles, truncateFiles=truncateFiles, ierr=local_ierr)
+               call mpas_timer_stop('createStream')
                stream % stream % blockWrite = stream % blockWrite
                if (local_ierr /= MPAS_STREAM_NOERR) then
                    if (local_ierr == MPAS_STREAM_CLOBBER_FILE) then
@@ -3275,7 +3277,9 @@ module mpas_stream_manager
                    end if
                end if
 
+               call mpas_timer_start('build_stream')
                call build_stream(stream, MPAS_STREAM_OUTPUT, manager % allFields, manager % allPackages, timeLevel, mgLevel, local_ierr)
+               call mpas_timer_stop('build_stream')
                if (local_ierr /= MPAS_STREAM_NOERR) then
                    ierr = MPAS_STREAM_MGR_ERROR
                    return
@@ -3322,9 +3326,11 @@ module mpas_stream_manager
                    !
                    ! Build new stream from pools of fields and attributes
                    !
+                   call mpas_timer_start('createStream')
                    call MPAS_createStream(stream % stream, manager % ioContext, stream % filename, stream % io_type, MPAS_IO_WRITE, &
                                           precision=stream % precision, clobberRecords=clobberRecords, &
                                           clobberFiles=clobberFiles, truncateFiles=truncateFiles, ierr=local_ierr)
+                   call mpas_timer_stop('createStream')
                    stream % stream % blockWrite = stream % blockWrite
                    if (local_ierr /= MPAS_STREAM_NOERR) then
                        if (local_ierr == MPAS_STREAM_CLOBBER_FILE) then
@@ -3363,7 +3369,9 @@ module mpas_stream_manager
                        end if
                    end if
 
+                   call mpas_timer_start('build_stream')
                    call build_stream(stream, MPAS_STREAM_OUTPUT, manager % allFields, manager % allPackages, timeLevel, mgLevel, local_ierr)
+                   call mpas_timer_stop('build_stream')
                    if (local_ierr /= MPAS_STREAM_NOERR) then
                        ierr = MPAS_STREAM_MGR_ERROR
                        return
@@ -3401,7 +3409,9 @@ module mpas_stream_manager
 
            if (timeLevel /= stream % timeLevel) then
 
+               call mpas_timer_start('update_stream')
                call update_stream(stream, manager % allFields, timeLevel, mgLevel, local_ierr)
+               call mpas_timer_stop('update_stream')
                if (local_ierr /= MPAS_STREAM_NOERR) then
                    ierr = MPAS_STREAM_MGR_ERROR
                    return
@@ -3414,8 +3424,10 @@ module mpas_stream_manager
            ! prewrite_reindex below rewrites connectivity on the host, and the write
            ! itself reads host memory.
            !
+           call mpas_timer_start('update_all_fields')
            call update_all_fields(manager % allFields, manager % allPackages, stream % field_pool, &
                                   stream % field_pkg_pool, stream % timeLevel, .false., local_ierr)
+           call mpas_timer_stop('update_all_fields')
 
            !
            ! For any connectivity arrays in the stream, temporarily convert local indices to global indices
@@ -3423,18 +3435,18 @@ module mpas_stream_manager
            !
            if ( .not. stream % blockWrite ) then
               STREAM_DEBUG_WRITE(' -- Prewrite reindex for stream ' // trim(stream % name))
-              call mpas_timer_start('stream write: reindex')
+              call mpas_timer_start('reindex')
               call prewrite_reindex(manager % allFields, manager % allPackages, stream % field_pool, stream % field_pkg_pool)
-              call mpas_timer_stop('stream write: reindex')
+              call mpas_timer_stop('reindex')
            end if
 
            ! 
            ! Write the stream
            ! 
            STREAM_DEBUG_WRITE(' -- Writing stream ' // trim(stream % name))
-           call mpas_timer_start('stream write: file')
+           call mpas_timer_start('file')
            call MPAS_writeStream(stream % stream, stream % nRecords, ierr=local_ierr)
-           call mpas_timer_stop('stream write: file')
+           call mpas_timer_stop('file')
 
            !
            ! Regardless of the error code from MPAS_writeStream, we need to reset global indices in the stream back to local indices
@@ -3749,8 +3761,10 @@ module mpas_stream_manager
                ! Build stream from pools of fields and attributes
                !
                allocate(stream % stream)
+               call mpas_timer_start('createStream')
                call MPAS_createStream(stream % stream, manager % ioContext, stream % filename, stream % io_type, MPAS_IO_READ, &
                                       precision=stream % precision, ierr=local_ierr)
+               call mpas_timer_stop('createStream')
                if (local_ierr /= MPAS_STREAM_NOERR) then
                    if (local_ierr == MPAS_IO_ERR_NOEXIST_READ) then
                        write(err_string,'(a)') 'Stream '''//trim(stream % name)//''' attempted to read non-existent file '''//trim(stream % filename)//''''
@@ -3762,7 +3776,9 @@ module mpas_stream_manager
                    return
                end if
 
+               call mpas_timer_start('build_stream')
                call build_stream(stream, MPAS_STREAM_INPUT, manager % allFields, manager % allPackages, timeLevel, mgLevel, local_ierr)
+               call mpas_timer_stop('build_stream')
                if (local_ierr /= MPAS_STREAM_NOERR) then
                    ierr = MPAS_STREAM_MGR_ERROR
                    return
@@ -3787,7 +3803,9 @@ module mpas_stream_manager
               !
               ! Build new stream from pools of fields and attributes
               !
+              call mpas_timer_start('createStream')
               call MPAS_createStream(stream % stream, manager % ioContext, stream % filename, stream % io_type, MPAS_IO_READ, precision=stream % precision, ierr=local_ierr)
+              call mpas_timer_stop('createStream')
               if (local_ierr /= MPAS_STREAM_NOERR) then
                   if (local_ierr == MPAS_IO_ERR_NOEXIST_READ) then
                       write(err_string,'(a)') 'Stream '''//trim(stream % name)//''' attempted to read non-existent file '''//trim(stream % filename)//''''
@@ -3799,7 +3817,9 @@ module mpas_stream_manager
                   return
               end if
 
+              call mpas_timer_start('build_stream')
               call build_stream(stream, MPAS_STREAM_INPUT, manager % allFields, manager % allPackages, timeLevel, mgLevel, local_ierr)
+              call mpas_timer_stop('build_stream')
               if (local_ierr /= MPAS_STREAM_NOERR) then
                   ierr = MPAS_STREAM_MGR_ERROR
                   return
@@ -3812,7 +3832,9 @@ module mpas_stream_manager
            !
            ! With multiple times per file, we need to get the record number from MPAS_seekStream.
            !
+           call mpas_timer_start('seek')
            stream % nRecords = MPAS_seekStream(stream % stream, when, whence, temp_actualWhen, maxRecords=temp_maxRecords, ierr=local_ierr)
+           call mpas_timer_stop('seek')
 
            if ( stream % nRecords == 0 .and. temp_maxRecords == 0 ) then
                stream % nRecords = 1
@@ -3911,7 +3933,9 @@ module mpas_stream_manager
 
               ! If file exists, the testing stream needs to be built.
               if ( retestFile ) then
+                  call mpas_timer_start('retest createStream')
                   call mpas_createStream(testStream, manager % ioContext, test_filename, stream % io_type, MPAS_IO_READ, precision=stream % precision, ierr=local_ierr)
+                  call mpas_timer_stop('retest createStream')
               else
                   STREAM_DEBUG_WRITE(' Filename: ' // trim(test_filename) // ' does not exist.')
                   ierr = MPAS_STREAM_MGR_ERROR
@@ -3921,7 +3945,9 @@ module mpas_stream_manager
 
            ! Only continue testing file it if was found.
            if ( retestFile ) then
+              call mpas_timer_start('retest seek')
               test_record = MPAS_seekStream(testStream, when, whence, test_actualWhen, maxRecords=test_maxRecords, ierr=local_ierr)
+              call mpas_timer_stop('retest seek')
 
               STREAM_DEBUG_WRITE(' -- Test record is $i out of $i with a time of ' // trim(test_actualWhen) COMMA intArgs=(/test_record COMMA test_maxRecords/))
 
@@ -3967,7 +3993,9 @@ module mpas_stream_manager
               else
                   rebuildStream = .false.
               end if
+              call mpas_timer_start('retest closeStream')
               call MPAS_closeStream(testStream, ierr=local_ierr)
+              call mpas_timer_stop('retest closeStream')
            end if
 
            ! Rebuild stream if we need to, because a different file has a closer time.
@@ -3987,13 +4015,17 @@ module mpas_stream_manager
               !
               ! Build new stream from pools of fields and attributes
               !
+              call mpas_timer_start('createStream')
               call MPAS_createStream(stream % stream, manager % ioContext, stream % filename, stream % io_type, MPAS_IO_READ, precision=stream % precision, ierr=local_ierr)
+              call mpas_timer_stop('createStream')
               if (local_ierr /= MPAS_STREAM_NOERR) then
                   ierr = MPAS_STREAM_MGR_ERROR
                   return
               end if
 
+              call mpas_timer_start('build_stream')
               call build_stream(stream, MPAS_STREAM_INPUT, manager % allFields, manager % allPackages, timeLevel, mgLevel, local_ierr)
+              call mpas_timer_stop('build_stream')
               if (local_ierr /= MPAS_STREAM_NOERR) then
                   ierr = MPAS_STREAM_MGR_ERROR
                   return
@@ -4006,7 +4038,9 @@ module mpas_stream_manager
 
            if (timeLevel /= stream % timeLevel) then
 
+               call mpas_timer_start('update_stream')
                call update_stream(stream, manager % allFields, timeLevel, mgLevel, local_ierr)
+               call mpas_timer_stop('update_stream')
                if (local_ierr /= MPAS_STREAM_NOERR) then
                    ierr = MPAS_STREAM_MGR_ERROR
                    return
@@ -4017,9 +4051,9 @@ module mpas_stream_manager
            ! 
            ! Read the stream
            ! 
-           call mpas_timer_start('stream read: file')
+           call mpas_timer_start('file')
            call MPAS_readStream(stream % stream, stream % nRecords, ierr=local_ierr)
-           call mpas_timer_stop('stream read: file')
+           call mpas_timer_stop('file')
            if (local_ierr /= MPAS_STREAM_NOERR) then
                ierr = MPAS_STREAM_MGR_ERROR
                return
@@ -4039,25 +4073,27 @@ module mpas_stream_manager
            !
            ! Exchange halos for all decomposed fields in this stream
            !
-           call mpas_timer_start('stream read: halo exch')
+           call mpas_timer_start('halo exch')
            call exch_all_halos(manager % allFields, manager % allPackages, stream % field_pool, stream % field_pkg_pool, &
                                stream % timeLevel, local_ierr)
-           call mpas_timer_stop('stream read: halo exch')
+           call mpas_timer_stop('halo exch')
 
            !
            ! For any connectivity arrays in this stream, convert global indices to local indices
            !
-           call mpas_timer_start('stream read: reindex')
+           call mpas_timer_start('reindex')
            call postread_reindex(manager % allFields, manager % allPackages, stream % field_pool, stream % field_pkg_pool)
-           call mpas_timer_stop('stream read: reindex')
+           call mpas_timer_stop('reindex')
 
            !
            ! Publish the freshly-read fields to the device. This runs last, after
            ! exch_all_halos and postread_reindex, because both of those are host-side
            ! algorithms whose results must also reach the device.
            !
+           call mpas_timer_start('update_all_fields')
            call update_all_fields(manager % allFields, manager % allPackages, stream % field_pool, &
                                   stream % field_pkg_pool, stream % timeLevel, .true., local_ierr)
+           call mpas_timer_stop('update_all_fields')
         end if
 
     end subroutine read_stream !}}}
@@ -4941,11 +4977,7 @@ module mpas_stream_manager
 
         ierr = MPAS_STREAM_MGR_NOERR
 
-        if (toDevice) then
-            call mpas_timer_start('stream read [ACC_data_xfer]')
-        else
-            call mpas_timer_start('stream write [ACC_data_xfer]')
-        end if
+        call mpas_timer_start('[ACC_data_xfer]')
 
         call mpas_pool_begin_iteration(streamFields)
 
@@ -5085,11 +5117,7 @@ module mpas_stream_manager
 
         end do
 
-        if (toDevice) then
-            call mpas_timer_stop('stream read [ACC_data_xfer]')
-        else
-            call mpas_timer_stop('stream write [ACC_data_xfer]')
-        end if
+        call mpas_timer_stop('[ACC_data_xfer]')
 
     end subroutine update_all_fields !}}}
 
