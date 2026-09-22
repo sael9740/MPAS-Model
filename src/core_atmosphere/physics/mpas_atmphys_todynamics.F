@@ -69,12 +69,11 @@
  type(mpas_pool_type),intent(in):: tend
 
 !theta_m, scalars, mass (rho_zz), and tend_scalars (scalars_tend) no longer need staging here:
-!theta_m/scalars are permanently device-resident (see mpas_atm_dynamics_state_init) and are now
-!read directly by physics_get_tend_work's GPU-ported tendency-conversion step instead of a host
-!copy; tend_scalars is zeroed directly on device in physics_get_tend. mass_edge (rho_edge) was
-!only read by scheme-gated code in physics_get_tend_work, which does not execute for this test
-!configuration. If a physics scheme is enabled and reads mass/mass_edge from CPU-only code, that
-!staging will need to be reinstated here.
+!they are device-resident from allocation, and are read directly by physics_get_tend_work's
+!tendency-conversion step rather than from a host copy. mass_edge (rho_edge) was only read by
+!scheme-gated code in physics_get_tend_work, which does not execute for this test configuration.
+!If a physics scheme is enabled and reads mass/mass_edge from CPU-only code, that staging will
+!need to be reinstated here.
 
  end subroutine pre_physics_get_tend
  
@@ -130,9 +129,6 @@
  real(kind=RKIND),dimension(:,:),pointer:: rublten_Edge,rucuten_Edge
 
  real(kind=RKIND),dimension(:,:),allocatable:: tend_th
-
- integer:: nCellsSolve_acc
- integer:: nCells_acc, nEdges_acc
 
 !=================================================================================================================
 
@@ -197,68 +193,13 @@
  allocate(tend_th(nVertLevels,nCellsSolve))
  !$acc enter data create(tend_th)
 
- nCellsSolve_acc = nCellsSolve
- nCells_acc = nCells
- nEdges_acc = nEdges
-
-!tend_th, tend_scalars, tend_rtheta_physics, tend_rho_physics, and tend_ru_physics are all
-!device-resident (tend_scalars/tend_rtheta_physics/tend_rho_physics/tend_ru_physics
-!persistently so -- see mpas_atm_dynamics_state_init and the enter data create/copyin in
-!atm_srk3 -- tend_th only for the duration of this call), so their zero-fill runs on the
-!device directly rather than on the host followed by a copy. tend_th and tend_scalars are
-!only ever read within cellSolveStart..cellSolveEnd (see physics_get_tend_work and
-!atm_advance_scalars_work), so zeroing 1..nCellsSolve is sufficient for them; tend_rho_physics
-!is read over the wider cellStart..cellEnd range (atm_compute_dyn_tend_work), so it -- and,
-!to match the original tend_rtheta_physics(:,:)/tend_ru_physics(:,:) semantics exactly rather
-!than assume a narrower range is safe, tend_rtheta_physics/tend_ru_physics too -- are zeroed
-!over their full allocated range (1..nCells+1 / 1..nEdges+1), matching the ghost/padding cell
-!that mpas_allocate_scratch_field includes beyond nCells/nEdges.
- !$acc parallel ACC_DEFAULT_ARG
- !$acc loop collapse(2)
- do i = 1, nCellsSolve_acc
- do k = 1, nVertLevels
-    tend_th(k,i) = 0._RKIND
- end do
- end do
- !$acc end parallel
-
- !$acc parallel ACC_DEFAULT_ARG
- !$acc loop collapse(3)
- do n = 1, num_scalars
- do i = 1, nCellsSolve_acc
- do k = 1, nVertLevels
-    tend_scalars(n,k,i) = 0._RKIND
- end do
- end do
- end do
- !$acc end parallel
-
- !$acc parallel ACC_DEFAULT_ARG
- !$acc loop collapse(2)
- do i = 1, nCells_acc+1
- do k = 1, nVertLevels
-    tend_rtheta_physics(k,i) = 0._RKIND
- end do
- end do
- !$acc end parallel
-
- !$acc parallel ACC_DEFAULT_ARG
- !$acc loop collapse(2)
- do i = 1, nCells_acc+1
- do k = 1, nVertLevels
-    tend_rho_physics(k,i) = 0._RKIND
- end do
- end do
- !$acc end parallel
-
- !$acc parallel ACC_DEFAULT_ARG
- !$acc loop collapse(2)
- do i = 1, nEdges_acc+1
- do k = 1, nVertLevels
-    tend_ru_physics(k,i) = 0._RKIND
- end do
- end do
- !$acc end parallel
+ !$acc kernels ACC_DEFAULT_ARG
+ tend_th(:,:)             = 0._RKIND
+ tend_scalars(:,:,:)      = 0._RKIND
+ tend_ru_physics(:,:)     = 0._RKIND
+ tend_rtheta_physics(:,:) = 0._RKIND
+ tend_rho_physics(:,:)    = 0._RKIND
+ !$acc end kernels
 
 
 !in case some variables are not allocated due to their associated packages. We need to make their pointers
@@ -524,11 +465,9 @@
  endif
 
 !convert the tendency for the potential temperature to tendency for the modified potential temperature:
-!This runs unconditionally (not gated by any physics scheme), against theta_m/scalars/tend_scalars/
-!tend_theta, all of which are device-resident (see pre_physics_get_tend and the enter data create of
-!tend_rtheta_physics in atm_srk3), so it runs on the device here rather than requiring a host round-trip.
- !$acc parallel ACC_DEFAULT_ARG
- !$acc loop collapse(2)
+!This runs unconditionally (not gated by any physics scheme), against scalars/tend_theta/tend_th,
+!all of which are device-resident, so it runs on the device rather than via a host round-trip.
+ !$acc parallel loop gang vector collapse(2) ACC_DEFAULT_ARG
  do i = 1, nCellsSolve
  do k = 1, nVertLevels
     coeff = (1. + R_v/R_d * scalars(index_qv,k,i))
@@ -536,7 +475,6 @@
     tend_theta(k,i) = tend_theta(k,i) + tend_th(k,i)
  enddo
  enddo
- !$acc end parallel
 
  end subroutine physics_get_tend_work
 

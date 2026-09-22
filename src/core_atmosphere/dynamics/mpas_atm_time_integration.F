@@ -964,14 +964,12 @@ module atm_time_integration
       call mpas_allocate_scratch_field(tend_ru_physicsField)
 #endif
 
-      ! The ghost/padding-cell zero-fills that used to run here (tend_rtheta_physics(:,nCells+1),
-      ! tend_rho_physics(:,nCells+1), tend_ru_physics(:,nEdges+1)) are superseded by the
-      ! full-range GPU zero-fill of these arrays in physics_get_tend (see the enter data create
-      ! below and mpas_atmphys_todynamics.F), which covers this range too and runs before
-      ! anything reads these arrays on the device.
       call mpas_pool_get_array(tend_physics, 'tend_rtheta_physics', tend_rtheta_physics)
+      tend_rtheta_physics(:,nCells+1) = 0.0_RKIND
       call mpas_pool_get_array(tend_physics, 'tend_rho_physics', tend_rho_physics)
+      tend_rho_physics(:,nCells+1) = 0.0_RKIND
       call mpas_pool_get_array(tend_physics, 'tend_ru_physics', tend_ru_physics)
+      tend_ru_physics(:,nEdges+1) = 0.0_RKIND
 
       !
       ! Initialize RK weights
@@ -1697,18 +1695,11 @@ module atm_time_integration
       call mpas_pool_get_array(tend_physics, 'rthdynten', rthdynten)
       call mpas_pool_get_array(tend_physics, 'rqvdynten', rqvdynten)
 
-      ! Tight data region for the physics-boundary fields, covering everything up to the
-      ! microphysics call. It is closed just before that call and reopened just after (rather
-      ! than left open across it) so that, in a build without persistent GPU residency, this
-      ! section's host writes (the cu-scheme dynamical tendency, when active) are actually
-      ! pushed to device before pre_microphysics/post_microphysics do their own internal
-      ! update host/device on an overlapping field set, and so that code after the call gets a
-      ! fresh pull of whatever physics wrote, rather than stale data left over from before the
-      ! call. In GPU-resident mode (today) these fields already hold a persistent reference
-      ! from mpas_atm_dynamics_state_init, so entering/exiting this region is just a
-      ! reference-count bump/decrement -- no transfer, no cost -- and once physics itself runs
-      ! on GPU there is no host-side computation left in this span for the region to protect
-      ! either way. No explicit update self/device calls are needed in any of these cases.
+      ! Data region for the physics-boundary fields, closed just before the microphysics call.
+      ! Without persistent residency it pushes this section's host writes (the cu-scheme
+      ! dynamical tendency, when active) to the device and pulls results back; with residency
+      ! these fields are already present, so entering and exiting is only a reference-count
+      ! bump and decrement, with no transfer.
       !$acc data copy(scalars_1, scalars_2, theta_m, rthdynten, rqvdynten)
 
       if(config_convection_scheme == 'cu_grell_freitas' .or. &
@@ -1733,19 +1724,11 @@ module atm_time_integration
 
       end if
 
-      !simply set to zero negative mixing ratios of different water species (for now). This runs
-      !unconditionally, so it is ported to run directly against the device-resident scalars_2
-      !rather than requiring a host round-trip:
-      !$acc parallel ACC_DEFAULT_ARG
-      !$acc loop collapse(3)
-      do iCell = 1, nCells+1
-      do k = 1, nVertLevels
-      do iScalar = 1, num_scalars
-         if (scalars_2(iScalar,k,iCell) < 0.0_RKIND) scalars_2(iScalar,k,iCell) = 0.0_RKIND
-      end do
-      end do
-      end do
-      !$acc end parallel
+      !simply set to zero negative mixing ratios of different water species (for now):
+      !$acc kernels ACC_DEFAULT_ARG
+      where ( scalars_2(:,:,:) < 0.0)  &
+         scalars_2(:,:,:) = 0.0
+      !$acc end kernels
 
       !$acc end data
 
@@ -1762,16 +1745,6 @@ module atm_time_integration
         call mpas_timer_stop('microphysics')
         call post_microphysics( block % configs, state, diag, tend, 2)
       end if
-
-      ! Reopened after the microphysics call (rather than left open across it -- see the comment
-      ! above the first region) so that anything below reading scalars_2/theta_m/rthdynten/
-      ! rqvdynten gets a fresh pull of whatever physics wrote, instead of stale pre-call data.
-      ! Currently there is nothing in this subroutine between here and #endif that reads these
-      ! fields again, so this region has no live content today; it establishes the same
-      ! zero-cost-when-resident / correct-when-not pattern as the region above for whenever
-      ! code here needs them.
-      !$acc data copy(scalars_1, scalars_2, theta_m, rthdynten, rqvdynten)
-      !$acc end data
 
       !
       ! Note: A halo exchange for 'exner' here as well as at the end of
