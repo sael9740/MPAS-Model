@@ -823,6 +823,7 @@ module mpas_atm_boundaries
         type (block_type), pointer :: block => null()
         integer, dimension(:), pointer :: bdyMaskCell => null()
         integer :: maxvar2d_local, maxvar2d_global
+        integer :: iCell, nCellsSolve_acc
 
 
         call mpas_pool_get_config(blocklist % configs, 'config_apply_lbcs', config_apply_lbcs)
@@ -841,15 +842,17 @@ module mpas_atm_boundaries
             call mpas_pool_get_dimension(meshPool, 'nCellsSolve', nCellsSolve)
             call mpas_pool_get_array(meshPool, 'bdyMaskCell', bdyMaskCell)
 
-            ! Reduced on the device: with residency at allocation, bdyMaskCell is
-            ! populated on the device by the stream read and the host copy is never
-            ! updated, so a host-side maxval would see uninitialized memory. A bare
-            ! kernels region is correct in every build -- it reads the device copy
-            ! when the field is resident, and the compiler generates an implicit
-            ! copyin from the (valid) host copy when it is not.
-            !$acc kernels
-            maxvar2d_local = max(maxvar2d_local, maxval(bdyMaskCell(1:nCellsSolve)))
-            !$acc end kernels
+            ! Reduced on the device, where bdyMaskCell is the valid copy once it is
+            ! resident. This must be an explicit loop with a reduction clause rather
+            ! than maxval() inside a kernels region: for the latter nvfortran emits
+            ! only "implicit copyin(bdymaskcell(:))" and generates a serial kernel
+            ! whose result is never copied back, leaving maxvar2d_local at -huge and
+            ! silently disabling the check below.
+            nCellsSolve_acc = nCellsSolve
+            !$acc parallel loop gang vector reduction(max:maxvar2d_local) ACC_DEFAULT_ARG
+            do iCell = 1, nCellsSolve_acc
+                maxvar2d_local = max(maxvar2d_local, bdyMaskCell(iCell))
+            end do
 
             block => block % next
         end do
