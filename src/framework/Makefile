@@ -89,7 +89,7 @@ mpas_timer.o: mpas_kind_types.o mpas_dmpar.o mpas_threading.o mpas_log.o
 
 mpas_block_decomp.o: mpas_derived_types.o mpas_hash.o mpas_io_units.o mpas_dmpar.o mpas_timer.o mpas_ptscotch_interface.o
 
-mpas_block_creator.o: mpas_dmpar.o mpas_hash.o mpas_sort.o mpas_io_units.o mpas_block_decomp.o mpas_stream_manager.o mpas_decomp.o mpas_abort.o $(DEPS)
+mpas_block_creator.o: mpas_dmpar.o mpas_hash.o mpas_sort.o mpas_io_units.o mpas_block_decomp.o mpas_stream_manager.o mpas_decomp.o mpas_abort.o mpas_timer.o $(DEPS)
 
 mpas_io.o: mpas_dmpar.o mpas_attlist.o mpas_log.o
 
