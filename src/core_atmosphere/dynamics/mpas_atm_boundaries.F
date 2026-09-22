@@ -145,10 +145,13 @@ module mpas_atm_boundaries
 
         ierr = 0
 
+        call mpas_timer_start('mpas_atm_update_bdy_tend')
+
         call mpas_pool_get_subpool(block % structs, 'mesh', mesh)
         call mpas_pool_get_subpool(block % structs, 'state', state)
         call mpas_pool_get_subpool(block % structs, 'lbc', lbc)
 
+        call mpas_timer_start('mpas_atm_update_bdy_tend: lbc_in read')
         if (firstCall) then
             call MPAS_stream_mgr_read(streamManager, streamID='lbc_in', timeLevel=2, whence=MPAS_STREAM_LATEST_BEFORE, &
                                       actualWhen=read_time, ierr=ierr)
@@ -167,7 +170,9 @@ module mpas_atm_boundaries
                ierr = 1
             end if
         end if
+        call mpas_timer_stop('mpas_atm_update_bdy_tend: lbc_in read')
         if (ierr /= 0) then
+           call mpas_timer_stop('mpas_atm_update_bdy_tend')
            return
         end if
 
@@ -222,6 +227,8 @@ module mpas_atm_boundaries
         nVertLevels = nVertLevels_ptr
         nScalars = nScalars_ptr
         index_qv = index_qv_ptr
+
+        call mpas_timer_start('mpas_atm_update_bdy_tend: compute')
 
         ! Compute lbc_rho_zz
         !$acc parallel ACC_DEFAULT_ARG
@@ -332,6 +339,8 @@ module mpas_atm_boundaries
 
         end if
 
+        call mpas_timer_stop('mpas_atm_update_bdy_tend: compute')
+
         MPAS_ACC_TIMER_START('mpas_atm_update_bdy_tend [ACC_data_xfer]')
         if (.not. firstCall) then
             !$acc exit data copyout(lbc_tend_u, lbc_tend_ru, lbc_tend_rho_edge, lbc_tend_w, &
@@ -345,6 +354,8 @@ module mpas_atm_boundaries
         MPAS_ACC_TIMER_STOP('mpas_atm_update_bdy_tend [ACC_data_xfer]')
 
         LBC_intv_end = currTime
+
+        call mpas_timer_stop('mpas_atm_update_bdy_tend')
 
     end subroutine mpas_atm_update_bdy_tend
 
