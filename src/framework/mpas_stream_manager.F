@@ -15,6 +15,7 @@ module mpas_stream_manager
     use mpas_stream_list
     use mpas_sort
     use mpas_threading
+    use mpas_timer, only : mpas_timer_start, mpas_timer_stop
 
 
     public :: MPAS_stream_mgr_init, &
@@ -3422,14 +3423,18 @@ module mpas_stream_manager
            !
            if ( .not. stream % blockWrite ) then
               STREAM_DEBUG_WRITE(' -- Prewrite reindex for stream ' // trim(stream % name))
+              call mpas_timer_start('stream write: reindex')
               call prewrite_reindex(manager % allFields, manager % allPackages, stream % field_pool, stream % field_pkg_pool)
+              call mpas_timer_stop('stream write: reindex')
            end if
 
            ! 
            ! Write the stream
            ! 
            STREAM_DEBUG_WRITE(' -- Writing stream ' // trim(stream % name))
+           call mpas_timer_start('stream write: file')
            call MPAS_writeStream(stream % stream, stream % nRecords, ierr=local_ierr)
+           call mpas_timer_stop('stream write: file')
 
            !
            ! Regardless of the error code from MPAS_writeStream, we need to reset global indices in the stream back to local indices
@@ -4012,7 +4017,9 @@ module mpas_stream_manager
            ! 
            ! Read the stream
            ! 
+           call mpas_timer_start('stream read: file')
            call MPAS_readStream(stream % stream, stream % nRecords, ierr=local_ierr)
+           call mpas_timer_stop('stream read: file')
            if (local_ierr /= MPAS_STREAM_NOERR) then
                ierr = MPAS_STREAM_MGR_ERROR
                return
@@ -4032,13 +4039,17 @@ module mpas_stream_manager
            !
            ! Exchange halos for all decomposed fields in this stream
            !
+           call mpas_timer_start('stream read: halo exch')
            call exch_all_halos(manager % allFields, manager % allPackages, stream % field_pool, stream % field_pkg_pool, &
                                stream % timeLevel, local_ierr)
+           call mpas_timer_stop('stream read: halo exch')
 
            !
            ! For any connectivity arrays in this stream, convert global indices to local indices
            !
+           call mpas_timer_start('stream read: reindex')
            call postread_reindex(manager % allFields, manager % allPackages, stream % field_pool, stream % field_pkg_pool)
+           call mpas_timer_stop('stream read: reindex')
 
            !
            ! Publish the freshly-read fields to the device. This runs last, after
@@ -4930,6 +4941,12 @@ module mpas_stream_manager
 
         ierr = MPAS_STREAM_MGR_NOERR
 
+        if (toDevice) then
+            call mpas_timer_start('stream read [ACC_data_xfer]')
+        else
+            call mpas_timer_start('stream write [ACC_data_xfer]')
+        end if
+
         call mpas_pool_begin_iteration(streamFields)
 
         do while ( mpas_pool_get_next_member(streamFields, fieldItr) )
@@ -5067,6 +5084,12 @@ module mpas_stream_manager
             end if
 
         end do
+
+        if (toDevice) then
+            call mpas_timer_stop('stream read [ACC_data_xfer]')
+        else
+            call mpas_timer_stop('stream write [ACC_data_xfer]')
+        end if
 
     end subroutine update_all_fields !}}}
 
