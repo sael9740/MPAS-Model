@@ -1003,14 +1003,6 @@ module atm_core
       end do
       !$acc end parallel
 
-      ! Publish to the host. This is not covered by the update_all_fields sync that
-      ! mpas_stream_manager.F performs before a stream write, because the host-side
-      ! diagnostics run in between: mpas_pv_diagnostics.F reads theta and rho on the
-      ! host to derive the potential-vorticity fields, so they must be valid here, not
-      ! merely by the time the write happens. if_present keeps the same line correct in
-      ! the hybrid build, where these were never made resident and the compute
-      ! construct's implicit data region has already copied them out.
-      !$acc update self(theta, rho, pressure) if_present
 
    end subroutine atm_compute_output_diagnostics
    
