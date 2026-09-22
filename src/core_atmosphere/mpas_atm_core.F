@@ -6,13 +6,6 @@
 ! distributed with this code, or at http://mpas-dev.github.com/license.html
 !
 
-! The generic "update self before stream write" hook now exists: update_all_fields in
-! mpas_stream_manager.F fetches every field of a stream from the device before the write.
-! The explicit update self in atm_compute_output_diagnostics below is therefore redundant, and
-! is retained only because that routine is also reachable from the pre-loop initial-output
-! path; removing it has not been separately verified.
-#define GPU_RESIDENT_IO_TODO(X)
-
 module atm_core
 
    use mpas_derived_types
@@ -1010,11 +1003,13 @@ module atm_core
       end do
       !$acc end parallel
 
-      ! These three exist to be written to a history file, so publish them to the
-      ! host. if_present keeps the same line correct in the hybrid build, where the
-      ! fields were never made resident and the compute construct's implicit data
-      ! region has already copied them out.
-      GPU_RESIDENT_IO_TODO(hand-published for the history stream; the stream manager has no device awareness)
+      ! Publish to the host. This is not covered by the update_all_fields sync that
+      ! mpas_stream_manager.F performs before a stream write, because the host-side
+      ! diagnostics run in between: mpas_pv_diagnostics.F reads theta and rho on the
+      ! host to derive the potential-vorticity fields, so they must be valid here, not
+      ! merely by the time the write happens. if_present keeps the same line correct in
+      ! the hybrid build, where these were never made resident and the compute
+      ! construct's implicit data region has already copied them out.
       !$acc update self(theta, rho, pressure) if_present
 
    end subroutine atm_compute_output_diagnostics

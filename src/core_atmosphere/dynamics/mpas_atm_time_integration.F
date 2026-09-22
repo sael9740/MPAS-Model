@@ -14,16 +14,6 @@
 #define MPAS_ACC_TIMER_STOP(X)
 #endif
 
-! TODO(gpu-resident-io): diag % theta, rho and pressure are computed on the device by
-! atm_compute_output_diagnostics (mpas_atm_core.F), which publishes them to the host itself
-! for the history stream. Pulling them here as well is redundant: this routine runs before
-! that computation, so the values it fetches are immediately superseded. They are retained
-! only until the stream manager gains a generic "update self before stream write" hook, at
-! which point both this sync and the explicit one in atm_compute_output_diagnostics should
-! be removed together. Until then, removing these in isolation would be safe but would leave
-! the two halves of the same mechanism looking inconsistent.
-#define GPU_RESIDENT_IO_TODO(X)
-
 module atm_time_integration
 
    use mpas_pool_routines
