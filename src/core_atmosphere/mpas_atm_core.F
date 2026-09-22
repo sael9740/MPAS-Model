@@ -973,6 +973,7 @@ module atm_core
    
       integer :: iCell, k
       integer, pointer :: nCells, nVertLevels, index_qv
+      integer :: nCells_acc, nVertLevels_acc, index_qv_acc
       real (kind=RKIND), dimension(:,:), pointer :: theta, rho, theta_m, rho_zz, zz
       real (kind=RKIND), dimension(:,:), pointer :: pressure_base, pressure_p, pressure
       real (kind=RKIND), dimension(:,:,:), pointer :: scalars
@@ -980,6 +981,10 @@ module atm_core
       call mpas_pool_get_dimension(mesh, 'nCells', nCells)
       call mpas_pool_get_dimension(mesh, 'nVertLevels', nVertLevels)
       call mpas_pool_get_dimension(state, 'index_qv', index_qv)
+
+      nCells_acc = nCells
+      nVertLevels_acc = nVertLevels
+      index_qv_acc = index_qv
 
       call mpas_pool_get_array(state, 'theta_m', theta_m, time_lev)
       call mpas_pool_get_array(state, 'rho_zz', rho_zz, time_lev)
@@ -993,13 +998,27 @@ module atm_core
 
       call mpas_pool_get_array(mesh, 'zz', zz)
 
-      do iCell=1,nCells
-         do k=1,nVertLevels
-            theta(k,iCell) = theta_m(k,iCell) / (1._RKIND + rvord * scalars(index_qv,k,iCell))
+      ! Computed on the device: every input and output here is part of the
+      ! permanently resident dynamics set, so running this on the host would read
+      ! whatever the host happened to hold and would leave the device copies of
+      ! theta, rho and pressure stale for the rest of the run.
+      !$acc parallel ACC_DEFAULT_ARG
+      !$acc loop gang worker
+      do iCell=1,nCells_acc
+         !$acc loop vector
+         do k=1,nVertLevels_acc
+            theta(k,iCell) = theta_m(k,iCell) / (1._RKIND + rvord * scalars(index_qv_acc,k,iCell))
             rho(k,iCell) = rho_zz(k,iCell) * zz(k,iCell)
             pressure(k,iCell) = pressure_base(k,iCell) + pressure_p(k,iCell)
          end do
       end do
+      !$acc end parallel
+
+      ! These three exist to be written to a history file, so publish them to the
+      ! host. if_present keeps the same line correct in the hybrid build, where the
+      ! fields were never made resident and the compute construct's implicit data
+      ! region has already copied them out.
+      !$acc update self(theta, rho, pressure) if_present
 
    end subroutine atm_compute_output_diagnostics
    
@@ -1813,11 +1832,13 @@ module atm_core
       call mpas_pool_get_array(mesh, 'zEdge', zEdge)
       call mpas_pool_get_array(mesh, 'angleEdge', angleEdge)
 
+      !$acc kernels
       deformation_coef_c2(:,:) = 0.
       deformation_coef_s2(:,:) = 0.
       deformation_coef_cs(:,:) = 0.
       deformation_coef_c(:,:) = 0.
       deformation_coef_s(:,:) = 0.
+      !$acc end kernels
 
       pii = 2.*asin(1.0)
 
