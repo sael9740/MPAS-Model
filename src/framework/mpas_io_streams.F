@@ -2467,15 +2467,9 @@ module mpas_io_streams
 
       integer :: k
 
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc parallel loop copy(dst) copyin(src(srcStart:srcStart+n-1))
-#endif
       do k = 0, n-1
          dst(dstStart+k) = src(srcStart+k)
       end do
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc end parallel loop
-#endif
    end subroutine io_streams_copy_field_1d_int!}}}
 
    subroutine io_streams_copy_field_2d_int(dst, dstStart, src, srcStart, n)!{{{
@@ -2489,17 +2483,11 @@ module mpas_io_streams
 
       n1 = size(dst,1)
 
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc parallel loop collapse(2) copy(dst) copyin(src(:,srcStart:srcStart+n-1))
-#endif
       do k2 = 0, n-1
          do k1 = 1, n1
             dst(k1, dstStart+k2) = src(k1, srcStart+k2)
          end do
       end do
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc end parallel loop
-#endif
    end subroutine io_streams_copy_field_2d_int!}}}
 
    subroutine io_streams_copy_field_2d_int_j(dst, j, dstStart, src, srcStart, n)!{{{
@@ -2512,15 +2500,9 @@ module mpas_io_streams
 
       integer :: k
 
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc parallel loop copy(dst) copyin(src(srcStart:srcStart+n-1))
-#endif
       do k = 0, n-1
          dst(j, dstStart+k) = src(srcStart+k)
       end do
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc end parallel loop
-#endif
    end subroutine io_streams_copy_field_2d_int_j!}}}
 
    subroutine io_streams_copy_field_3d_int(dst, dstStart, src, srcStart, n)!{{{
@@ -2535,9 +2517,6 @@ module mpas_io_streams
       n1 = size(dst,1)
       n2 = size(dst,2)
 
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc parallel loop collapse(3) copy(dst) copyin(src(:,:,srcStart:srcStart+n-1))
-#endif
       do k3 = 0, n-1
          do k2 = 1, n2
             do k1 = 1, n1
@@ -2545,9 +2524,6 @@ module mpas_io_streams
             end do
          end do
       end do
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc end parallel loop
-#endif
    end subroutine io_streams_copy_field_3d_int!}}}
 
    subroutine io_streams_copy_field_3d_int_j(dst, j, dstStart, src, srcStart, n)!{{{
@@ -2562,17 +2538,11 @@ module mpas_io_streams
 
       n1 = size(dst,2)
 
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc parallel loop collapse(2) copy(dst) copyin(src(:,srcStart:srcStart+n-1))
-#endif
       do k2 = 0, n-1
          do k1 = 1, n1
             dst(j, k1, dstStart+k2) = src(k1, srcStart+k2)
          end do
       end do
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc end parallel loop
-#endif
    end subroutine io_streams_copy_field_3d_int_j!}}}
 
    subroutine io_streams_copy_field_1d_real(dst, dstStart, src, srcStart, n)!{{{
@@ -2584,15 +2554,9 @@ module mpas_io_streams
 
       integer :: k
 
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc parallel loop copy(dst) copyin(src(srcStart:srcStart+n-1))
-#endif
       do k = 0, n-1
          dst(dstStart+k) = src(srcStart+k)
       end do
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc end parallel loop
-#endif
    end subroutine io_streams_copy_field_1d_real!}}}
 
    subroutine io_streams_copy_field_2d_real(dst, dstStart, src, srcStart, n)!{{{
@@ -2606,17 +2570,11 @@ module mpas_io_streams
 
       n1 = size(dst,1)
 
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc parallel loop collapse(2) copy(dst) copyin(src(:,srcStart:srcStart+n-1))
-#endif
       do k2 = 0, n-1
          do k1 = 1, n1
             dst(k1, dstStart+k2) = src(k1, srcStart+k2)
          end do
       end do
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc end parallel loop
-#endif
    end subroutine io_streams_copy_field_2d_real!}}}
 
    subroutine io_streams_copy_field_2d_real_j(dst, j, dstStart, src, srcStart, n)!{{{
@@ -2629,15 +2587,9 @@ module mpas_io_streams
 
       integer :: k
 
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc parallel loop copy(dst) copyin(src(srcStart:srcStart+n-1))
-#endif
       do k = 0, n-1
          dst(j, dstStart+k) = src(srcStart+k)
       end do
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc end parallel loop
-#endif
    end subroutine io_streams_copy_field_2d_real_j!}}}
 
    subroutine io_streams_copy_field_3d_real(dst, dstStart, src, srcStart, n)!{{{
@@ -2652,9 +2604,6 @@ module mpas_io_streams
       n1 = size(dst,1)
       n2 = size(dst,2)
 
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc parallel loop collapse(3) copy(dst) copyin(src(:,:,srcStart:srcStart+n-1))
-#endif
       do k3 = 0, n-1
          do k2 = 1, n2
             do k1 = 1, n1
@@ -2662,9 +2611,6 @@ module mpas_io_streams
             end do
          end do
       end do
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc end parallel loop
-#endif
    end subroutine io_streams_copy_field_3d_real!}}}
 
    subroutine io_streams_copy_field_3d_real_j(dst, j, dstStart, src, srcStart, n)!{{{
@@ -2679,17 +2625,11 @@ module mpas_io_streams
 
       n1 = size(dst,2)
 
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc parallel loop collapse(2) copy(dst) copyin(src(:,srcStart:srcStart+n-1))
-#endif
       do k2 = 0, n-1
          do k1 = 1, n1
             dst(j, k1, dstStart+k2) = src(k1, srcStart+k2)
          end do
       end do
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc end parallel loop
-#endif
    end subroutine io_streams_copy_field_3d_real_j!}}}
 
    subroutine io_streams_copy_field_4d_real(dst, dstStart, src, srcStart, n)!{{{
@@ -2705,9 +2645,6 @@ module mpas_io_streams
       n2 = size(dst,2)
       n3 = size(dst,3)
 
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc parallel loop collapse(4) copy(dst) copyin(src(:,:,:,srcStart:srcStart+n-1))
-#endif
       do k4 = 0, n-1
          do k3 = 1, n3
             do k2 = 1, n2
@@ -2717,9 +2654,6 @@ module mpas_io_streams
             end do
          end do
       end do
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc end parallel loop
-#endif
    end subroutine io_streams_copy_field_4d_real!}}}
 
    subroutine io_streams_copy_field_4d_real_j(dst, j, dstStart, src, srcStart, n)!{{{
@@ -2735,9 +2669,6 @@ module mpas_io_streams
       n1 = size(dst,2)
       n2 = size(dst,3)
 
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc parallel loop collapse(3) copy(dst) copyin(src(:,:,srcStart:srcStart+n-1))
-#endif
       do k3 = 0, n-1
          do k2 = 1, n2
             do k1 = 1, n1
@@ -2745,9 +2676,6 @@ module mpas_io_streams
             end do
          end do
       end do
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc end parallel loop
-#endif
    end subroutine io_streams_copy_field_4d_real_j!}}}
 
    subroutine io_streams_copy_field_5d_real(dst, dstStart, src, srcStart, n)!{{{
@@ -2764,9 +2692,6 @@ module mpas_io_streams
       n3 = size(dst,3)
       n4 = size(dst,4)
 
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc parallel loop collapse(5) copy(dst) copyin(src(:,:,:,:,srcStart:srcStart+n-1))
-#endif
       do k5 = 0, n-1
          do k4 = 1, n4
             do k3 = 1, n3
@@ -2778,9 +2703,6 @@ module mpas_io_streams
             end do
          end do
       end do
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc end parallel loop
-#endif
    end subroutine io_streams_copy_field_5d_real!}}}
 
    subroutine io_streams_copy_field_5d_real_j(dst, j, dstStart, src, srcStart, n)!{{{
@@ -2797,9 +2719,6 @@ module mpas_io_streams
       n2 = size(dst,3)
       n3 = size(dst,4)
 
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc parallel loop collapse(4) copy(dst) copyin(src(:,:,:,srcStart:srcStart+n-1))
-#endif
       do k4 = 0, n-1
          do k3 = 1, n3
             do k2 = 1, n2
@@ -2809,9 +2728,6 @@ module mpas_io_streams
             end do
          end do
       end do
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc end parallel loop
-#endif
    end subroutine io_streams_copy_field_5d_real_j!}}}
 
 
@@ -3667,15 +3583,9 @@ module mpas_io_streams
 
       integer :: k
 
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc parallel loop copyout(dst(dstStart:dstStart+n-1)) copyin(src)
-#endif
       do k = 0, n-1
          dst(dstStart+k) = src(srcStart+k)
       end do
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc end parallel loop
-#endif
    end subroutine io_streams_gather_field_1d_int!}}}
 
    subroutine io_streams_gather_field_2d_int(dst, dstStart, src, srcStart, n)!{{{
@@ -3689,17 +3599,11 @@ module mpas_io_streams
 
       n1 = size(src,1)
 
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc parallel loop collapse(2) copyout(dst(:,dstStart:dstStart+n-1)) copyin(src)
-#endif
       do k2 = 0, n-1
          do k1 = 1, n1
             dst(k1, dstStart+k2) = src(k1, srcStart+k2)
          end do
       end do
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc end parallel loop
-#endif
    end subroutine io_streams_gather_field_2d_int!}}}
 
    subroutine io_streams_gather_field_2d_int_j(dst, dstStart, src, j, srcStart, n)!{{{
@@ -3712,15 +3616,9 @@ module mpas_io_streams
 
       integer :: k
 
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc parallel loop copyout(dst(dstStart:dstStart+n-1)) copyin(src)
-#endif
       do k = 0, n-1
          dst(dstStart+k) = src(j, srcStart+k)
       end do
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc end parallel loop
-#endif
    end subroutine io_streams_gather_field_2d_int_j!}}}
 
    subroutine io_streams_gather_field_3d_int(dst, dstStart, src, srcStart, n)!{{{
@@ -3735,9 +3633,6 @@ module mpas_io_streams
       n1 = size(src,1)
       n2 = size(src,2)
 
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc parallel loop collapse(3) copyout(dst(:,:,dstStart:dstStart+n-1)) copyin(src)
-#endif
       do k3 = 0, n-1
          do k2 = 1, n2
             do k1 = 1, n1
@@ -3745,9 +3640,6 @@ module mpas_io_streams
             end do
          end do
       end do
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc end parallel loop
-#endif
    end subroutine io_streams_gather_field_3d_int!}}}
 
    subroutine io_streams_gather_field_3d_int_j(dst, dstStart, src, j, srcStart, n)!{{{
@@ -3762,17 +3654,11 @@ module mpas_io_streams
 
       n1 = size(src,2)
 
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc parallel loop collapse(2) copyout(dst(:,dstStart:dstStart+n-1)) copyin(src)
-#endif
       do k2 = 0, n-1
          do k1 = 1, n1
             dst(k1, dstStart+k2) = src(j, k1, srcStart+k2)
          end do
       end do
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc end parallel loop
-#endif
    end subroutine io_streams_gather_field_3d_int_j!}}}
 
    subroutine io_streams_gather_field_1d_real(dst, dstStart, src, srcStart, n)!{{{
@@ -3784,15 +3670,9 @@ module mpas_io_streams
 
       integer :: k
 
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc parallel loop copyout(dst(dstStart:dstStart+n-1)) copyin(src)
-#endif
       do k = 0, n-1
          dst(dstStart+k) = src(srcStart+k)
       end do
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc end parallel loop
-#endif
    end subroutine io_streams_gather_field_1d_real!}}}
 
    subroutine io_streams_gather_field_2d_real(dst, dstStart, src, srcStart, n)!{{{
@@ -3806,17 +3686,11 @@ module mpas_io_streams
 
       n1 = size(src,1)
 
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc parallel loop collapse(2) copyout(dst(:,dstStart:dstStart+n-1)) copyin(src)
-#endif
       do k2 = 0, n-1
          do k1 = 1, n1
             dst(k1, dstStart+k2) = src(k1, srcStart+k2)
          end do
       end do
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc end parallel loop
-#endif
    end subroutine io_streams_gather_field_2d_real!}}}
 
    subroutine io_streams_gather_field_2d_real_j(dst, dstStart, src, j, srcStart, n)!{{{
@@ -3829,15 +3703,9 @@ module mpas_io_streams
 
       integer :: k
 
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc parallel loop copyout(dst(dstStart:dstStart+n-1)) copyin(src)
-#endif
       do k = 0, n-1
          dst(dstStart+k) = src(j, srcStart+k)
       end do
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc end parallel loop
-#endif
    end subroutine io_streams_gather_field_2d_real_j!}}}
 
    subroutine io_streams_gather_field_3d_real(dst, dstStart, src, srcStart, n)!{{{
@@ -3852,9 +3720,6 @@ module mpas_io_streams
       n1 = size(src,1)
       n2 = size(src,2)
 
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc parallel loop collapse(3) copyout(dst(:,:,dstStart:dstStart+n-1)) copyin(src)
-#endif
       do k3 = 0, n-1
          do k2 = 1, n2
             do k1 = 1, n1
@@ -3862,9 +3727,6 @@ module mpas_io_streams
             end do
          end do
       end do
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc end parallel loop
-#endif
    end subroutine io_streams_gather_field_3d_real!}}}
 
    subroutine io_streams_gather_field_3d_real_j(dst, dstStart, src, j, srcStart, n)!{{{
@@ -3879,17 +3741,11 @@ module mpas_io_streams
 
       n1 = size(src,2)
 
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc parallel loop collapse(2) copyout(dst(:,dstStart:dstStart+n-1)) copyin(src)
-#endif
       do k2 = 0, n-1
          do k1 = 1, n1
             dst(k1, dstStart+k2) = src(j, k1, srcStart+k2)
          end do
       end do
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc end parallel loop
-#endif
    end subroutine io_streams_gather_field_3d_real_j!}}}
 
    subroutine io_streams_gather_field_4d_real(dst, dstStart, src, srcStart, n)!{{{
@@ -3905,9 +3761,6 @@ module mpas_io_streams
       n2 = size(src,2)
       n3 = size(src,3)
 
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc parallel loop collapse(4) copyout(dst(:,:,:,dstStart:dstStart+n-1)) copyin(src)
-#endif
       do k4 = 0, n-1
          do k3 = 1, n3
             do k2 = 1, n2
@@ -3917,9 +3770,6 @@ module mpas_io_streams
             end do
          end do
       end do
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc end parallel loop
-#endif
    end subroutine io_streams_gather_field_4d_real!}}}
 
    subroutine io_streams_gather_field_4d_real_j(dst, dstStart, src, j, srcStart, n)!{{{
@@ -3935,9 +3785,6 @@ module mpas_io_streams
       n1 = size(src,2)
       n2 = size(src,3)
 
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc parallel loop collapse(3) copyout(dst(:,:,dstStart:dstStart+n-1)) copyin(src)
-#endif
       do k3 = 0, n-1
          do k2 = 1, n2
             do k1 = 1, n1
@@ -3945,9 +3792,6 @@ module mpas_io_streams
             end do
          end do
       end do
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc end parallel loop
-#endif
    end subroutine io_streams_gather_field_4d_real_j!}}}
 
    subroutine io_streams_gather_field_5d_real(dst, dstStart, src, srcStart, n)!{{{
@@ -3964,9 +3808,6 @@ module mpas_io_streams
       n3 = size(src,3)
       n4 = size(src,4)
 
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc parallel loop collapse(5) copyout(dst(:,:,:,:,dstStart:dstStart+n-1)) copyin(src)
-#endif
       do k5 = 0, n-1
          do k4 = 1, n4
             do k3 = 1, n3
@@ -3978,9 +3819,6 @@ module mpas_io_streams
             end do
          end do
       end do
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc end parallel loop
-#endif
    end subroutine io_streams_gather_field_5d_real!}}}
 
    subroutine io_streams_gather_field_5d_real_j(dst, dstStart, src, j, srcStart, n)!{{{
@@ -3997,9 +3835,6 @@ module mpas_io_streams
       n2 = size(src,3)
       n3 = size(src,4)
 
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc parallel loop collapse(4) copyout(dst(:,:,:,dstStart:dstStart+n-1)) copyin(src)
-#endif
       do k4 = 0, n-1
          do k3 = 1, n3
             do k2 = 1, n2
@@ -4009,9 +3844,6 @@ module mpas_io_streams
             end do
          end do
       end do
-#ifdef ACC_DEVICE_RESIDENT
-      !$acc end parallel loop
-#endif
    end subroutine io_streams_gather_field_5d_real_j!}}}
 
 

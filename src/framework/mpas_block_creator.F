@@ -1580,72 +1580,64 @@ module mpas_block_creator
       real (kind=RKIND), dimension(:) :: array
       real (kind=RKIND), intent(in) :: defaultValue
 
-      !$acc kernels copyout(array)
       array(:) = defaultValue
-      !$acc end kernels
+      !$acc update device(array) if_present
    end subroutine block_creator_set_default_1d_real!}}}
 
    subroutine block_creator_set_default_2d_real(array, defaultValue)!{{{
       real (kind=RKIND), dimension(:,:) :: array
       real (kind=RKIND), intent(in) :: defaultValue
 
-      !$acc kernels copyout(array)
       array(:,:) = defaultValue
-      !$acc end kernels
+      !$acc update device(array) if_present
    end subroutine block_creator_set_default_2d_real!}}}
 
    subroutine block_creator_set_default_3d_real(array, defaultValue)!{{{
       real (kind=RKIND), dimension(:,:,:) :: array
       real (kind=RKIND), intent(in) :: defaultValue
 
-      !$acc kernels copyout(array)
       array(:,:,:) = defaultValue
-      !$acc end kernels
+      !$acc update device(array) if_present
    end subroutine block_creator_set_default_3d_real!}}}
 
    subroutine block_creator_set_default_4d_real(array, defaultValue)!{{{
       real (kind=RKIND), dimension(:,:,:,:) :: array
       real (kind=RKIND), intent(in) :: defaultValue
 
-      !$acc kernels copyout(array)
       array(:,:,:,:) = defaultValue
-      !$acc end kernels
+      !$acc update device(array) if_present
    end subroutine block_creator_set_default_4d_real!}}}
 
    subroutine block_creator_set_default_5d_real(array, defaultValue)!{{{
       real (kind=RKIND), dimension(:,:,:,:,:) :: array
       real (kind=RKIND), intent(in) :: defaultValue
 
-      !$acc kernels copyout(array)
       array(:,:,:,:,:) = defaultValue
-      !$acc end kernels
+      !$acc update device(array) if_present
    end subroutine block_creator_set_default_5d_real!}}}
 
    subroutine block_creator_set_default_1d_int(array, defaultValue)!{{{
       integer, dimension(:) :: array
       integer, intent(in) :: defaultValue
 
-      !$acc kernels copyout(array)
       array(:) = defaultValue
-      !$acc end kernels
+      !$acc update device(array) if_present
    end subroutine block_creator_set_default_1d_int!}}}
 
    subroutine block_creator_set_default_2d_int(array, defaultValue)!{{{
       integer, dimension(:,:) :: array
       integer, intent(in) :: defaultValue
 
-      !$acc kernels copyout(array)
       array(:,:) = defaultValue
-      !$acc end kernels
+      !$acc update device(array) if_present
    end subroutine block_creator_set_default_2d_int!}}}
 
    subroutine block_creator_set_default_3d_int(array, defaultValue)!{{{
       integer, dimension(:,:,:) :: array
       integer, intent(in) :: defaultValue
 
-      !$acc kernels copyout(array)
       array(:,:,:) = defaultValue
-      !$acc end kernels
+      !$acc update device(array) if_present
    end subroutine block_creator_set_default_3d_int!}}}
 
 !***********************************************************************

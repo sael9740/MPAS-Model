@@ -3409,6 +3409,14 @@ module mpas_stream_manager
            end if
 
            !
+           ! Fetch the device copies before any host-side work touches these fields:
+           ! prewrite_reindex below rewrites connectivity on the host, and the write
+           ! itself reads host memory.
+           !
+           call update_all_fields(manager % allFields, manager % allPackages, stream % field_pool, &
+                                  stream % field_pkg_pool, stream % timeLevel, .false., local_ierr)
+
+           !
            ! For any connectivity arrays in the stream, temporarily convert local indices to global indices
            ! unless this stream is using blockWrite
            !
@@ -4031,6 +4039,14 @@ module mpas_stream_manager
            ! For any connectivity arrays in this stream, convert global indices to local indices
            !
            call postread_reindex(manager % allFields, manager % allPackages, stream % field_pool, stream % field_pkg_pool)
+
+           !
+           ! Publish the freshly-read fields to the device. This runs last, after
+           ! exch_all_halos and postread_reindex, because both of those are host-side
+           ! algorithms whose results must also reach the device.
+           !
+           call update_all_fields(manager % allFields, manager % allPackages, stream % field_pool, &
+                                  stream % field_pkg_pool, stream % timeLevel, .true., local_ierr)
         end if
 
     end subroutine read_stream !}}}
@@ -4861,6 +4877,198 @@ module mpas_stream_manager
         end do
 
     end subroutine exch_all_halos !}}}
+
+    !-----------------------------------------------------------------------
+    !  routine update_all_fields
+    !
+    !> \brief Synchronize every field in a stream between host and device
+    !> \details
+    !>  With fields made device-resident at allocation, the host and device
+    !>  copies must be reconciled around stream I/O: after a read the host holds
+    !>  the new values (and the results of exch_all_halos and postread_reindex,
+    !>  which are host-side algorithms), and before a write the device holds
+    !>  whatever the model just computed.
+    !>
+    !>  toDevice = .true.  publishes the host copy to the device, and is called
+    !>                     at the end of read_stream, after the host-side halo
+    !>                     exchange and index reindexing have run.
+    !>  toDevice = .false. fetches the device copy to the host, and is called at
+    !>                     the start of write_stream, before prewrite_reindex.
+    !>
+    !>  if_present makes both directions no-ops when a field was never made
+    !>  resident, so this is correct in the hybrid build as well.
+    !
+    !-----------------------------------------------------------------------
+    subroutine update_all_fields(allFields, allPackages, streamFields, fieldPkgPool, timeLevel, toDevice, ierr) !{{{
+
+        implicit none
+
+        type (mpas_pool_type), pointer :: allFields
+        type (mpas_pool_type), pointer :: allPackages
+        type (mpas_pool_type), pointer :: streamFields
+        type (mpas_pool_type), pointer :: fieldPkgPool
+        integer, intent(in) :: timeLevel
+        logical, intent(in) :: toDevice
+        integer, intent(out) :: ierr
+
+        type (mpas_pool_iterator_type) :: fieldItr
+        type (mpas_pool_field_info_type) :: fieldInfo
+
+        type (field1DReal), pointer :: real1DField
+        type (field2DReal), pointer :: real2DField
+        type (field3DReal), pointer :: real3DField
+        type (field4DReal), pointer :: real4DField
+        type (field5DReal), pointer :: real5DField
+        type (field1DInteger), pointer :: int1DField
+        type (field2DInteger), pointer :: int2DField
+        type (field3DInteger), pointer :: int3DField
+
+        character (len=StrKIND), pointer :: packages
+        logical :: active_field
+        integer :: err_level
+
+
+        ierr = MPAS_STREAM_MGR_NOERR
+
+        call mpas_pool_begin_iteration(streamFields)
+
+        do while ( mpas_pool_get_next_member(streamFields, fieldItr) )
+
+            ! Note: in a stream's field_pool, the names of fields are stored as configs
+            if ( fieldItr % memberType == MPAS_POOL_CONFIG ) then
+
+                !
+                ! Check whether the field is active in this stream
+                !
+                err_level = mpas_pool_get_error_level()
+                call mpas_pool_set_error_level(MPAS_POOL_SILENT)
+
+                nullify(packages)
+                call mpas_pool_get_config(fieldPkgPool, trim(fieldItr % memberName)//':packages', packages)
+                if (associated(packages)) then
+                    active_field = parse_package_list(allPackages, trim(packages))
+                else
+                    active_field = .true.
+                end if
+                call mpas_pool_set_error_level(err_level)
+
+                if (.not. active_field) then
+                    STREAM_DEBUG_WRITE('-- '//trim(fieldItr % memberName)//' not active in stream and halo will not be exchanged')
+                    cycle
+                end if
+
+                call mpas_pool_get_field_info(allFields, fieldItr % memberName, fieldInfo)
+
+                if ( fieldInfo % nDims == 1) then
+                    if ( fieldInfo % fieldType == MPAS_POOL_REAL ) then
+                        if ( timeLevel <= fieldInfo % nTimeLevels ) then
+                            call mpas_pool_get_field(allFields, fieldItr % memberName, real1DField, timeLevel)
+                        else
+                            call mpas_pool_get_field(allFields, fieldItr % memberName, real1DField, 1)
+                        end if
+
+                        if (toDevice) then
+                            !$acc update device(real1DField % array) if_present
+                        else
+                            !$acc update self(real1DField % array) if_present
+                        end if
+                    else if ( fieldInfo % fieldType == MPAS_POOL_INTEGER ) then
+                        if ( timeLevel <= fieldInfo % nTimeLevels ) then
+                          call mpas_pool_get_field(allFields, fieldItr % memberName, int1DField, timeLevel)
+                        else
+                          call mpas_pool_get_field(allFields, fieldItr % memberName, int1DField, 1)
+                        end if
+                        if (toDevice) then
+                            !$acc update device(int1DField % array) if_present
+                        else
+                            !$acc update self(int1DField % array) if_present
+                        end if
+                    end if
+
+                else if ( fieldInfo % nDims == 2) then
+                    if ( fieldInfo % fieldType == MPAS_POOL_REAL ) then
+                        if ( timeLevel <= fieldInfo % nTimeLevels ) then
+                            call mpas_pool_get_field(allFields, fieldItr % memberName, real2DField, timeLevel)
+                        else
+                            call mpas_pool_get_field(allFields, fieldItr % memberName, real2DField, 1)
+                        end if
+                        if (toDevice) then
+                            !$acc update device(real2DField % array) if_present
+                        else
+                            !$acc update self(real2DField % array) if_present
+                        end if
+                    else if ( fieldInfo % fieldType == MPAS_POOL_INTEGER ) then
+                        if ( timeLevel <= fieldInfo % nTimeLevels ) then
+                            call mpas_pool_get_field(allFields, fieldItr % memberName, int2DField, timeLevel)
+                        else
+                            call mpas_pool_get_field(allFields, fieldItr % memberName, int2DField, 1)
+                        end if
+                        if (toDevice) then
+                            !$acc update device(int2DField % array) if_present
+                        else
+                            !$acc update self(int2DField % array) if_present
+                        end if
+                    end if
+
+                else if ( fieldInfo % nDims == 3) then
+                    if ( fieldInfo % fieldType == MPAS_POOL_REAL ) then
+                        if ( timeLevel <= fieldInfo % nTimeLevels ) then
+                            call mpas_pool_get_field(allFields, fieldItr % memberName, real3DField, timeLevel)
+                        else
+                            call mpas_pool_get_field(allFields, fieldItr % memberName, real3DField, 1)
+                        end if
+                        if (toDevice) then
+                            !$acc update device(real3DField % array) if_present
+                        else
+                            !$acc update self(real3DField % array) if_present
+                        end if
+                    else if ( fieldInfo % fieldType == MPAS_POOL_INTEGER ) then
+                        if ( timeLevel <= fieldInfo % nTimeLevels ) then
+                            call mpas_pool_get_field(allFields, fieldItr % memberName, int3DField, timeLevel)
+                        else
+                            call mpas_pool_get_field(allFields, fieldItr % memberName, int3DField, 1)
+                        end if
+                        if (toDevice) then
+                            !$acc update device(int3DField % array) if_present
+                        else
+                            !$acc update self(int3DField % array) if_present
+                        end if
+                    end if
+
+                else if ( fieldInfo % nDims == 4) then
+                    if ( fieldInfo % fieldType == MPAS_POOL_REAL ) then
+                        if ( timeLevel <= fieldInfo % nTimeLevels ) then
+                            call mpas_pool_get_field(allFields, fieldItr % memberName, real4DField, timeLevel)
+                        else
+                            call mpas_pool_get_field(allFields, fieldItr % memberName, real4DField, 1)
+                        end if
+                        if (toDevice) then
+                            !$acc update device(real4DField % array) if_present
+                        else
+                            !$acc update self(real4DField % array) if_present
+                        end if
+                    end if
+
+                else if ( fieldInfo % nDims == 5) then
+                    if ( fieldInfo % fieldType == MPAS_POOL_REAL ) then
+                        if ( timeLevel <= fieldInfo % nTimeLevels ) then
+                            call mpas_pool_get_field(allFields, fieldItr % memberName, real5DField, timeLevel)
+                        else
+                            call mpas_pool_get_field(allFields, fieldItr % memberName, real5DField, 1)
+                        end if
+                        if (toDevice) then
+                            !$acc update device(real5DField % array) if_present
+                        else
+                            !$acc update self(real5DField % array) if_present
+                        end if
+                    end if
+                end if
+
+            end if
+
+        end do
+
+    end subroutine update_all_fields !}}}
 
 
     !-----------------------------------------------------------------------
