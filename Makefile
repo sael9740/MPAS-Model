@@ -923,7 +923,15 @@ endif #OPENACC IF
 # nvhpc CPU builds: -Mnofma disables fused multiply-add (the dominant source
 # of CPU/GPU floating-point differences), and -gpu=math_uniform additionally
 # forces uniform (non-fast-math) GPU math library routines when OPENACC=true.
+#
+# It also defines MPAS_BFB, which selects bit-reproducible substitutes for the
+# few math intrinsics that -gpu=math_uniform does not cover (see
+# src/core_atmosphere/mpas_atm_core.F). Those substitutes are only wanted in a
+# validation build: they agree with the intrinsic to within a couple of ulp
+# rather than exactly, and they cost more arithmetic, so a production build
+# should keep the intrinsic.
 ifeq "$(NVHPC_BFB)" "true"
+        override CPPFLAGS += "-DMPAS_BFB"
 ifeq "$(OPENACC)" "true"
         FFLAGS += $(FFLAGS_NVHPC_ACC_BFB)
         LDFLAGS += $(FFLAGS_NVHPC_ACC_BFB)
