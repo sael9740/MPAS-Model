@@ -840,7 +840,15 @@ module mpas_atm_boundaries
             call mpas_pool_get_dimension(meshPool, 'nCellsSolve', nCellsSolve)
             call mpas_pool_get_array(meshPool, 'bdyMaskCell', bdyMaskCell)
 
+            ! Reduced on the device: with residency at allocation, bdyMaskCell is
+            ! populated on the device by the stream read and the host copy is never
+            ! updated, so a host-side maxval would see uninitialized memory. A bare
+            ! kernels region is correct in every build -- it reads the device copy
+            ! when the field is resident, and the compiler generates an implicit
+            ! copyin from the (valid) host copy when it is not.
+            !$acc kernels
             maxvar2d_local = max(maxvar2d_local, maxval(bdyMaskCell(1:nCellsSolve)))
+            !$acc end kernels
 
             block => block % next
         end do
