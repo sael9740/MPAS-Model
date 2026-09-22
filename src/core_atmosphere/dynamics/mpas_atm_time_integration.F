@@ -955,11 +955,13 @@ module atm_time_integration
 #endif
 
       call mpas_pool_get_array(tend_physics, 'tend_rtheta_physics', tend_rtheta_physics)
-      tend_rtheta_physics(:,nCells+1) = 0.0_RKIND
       call mpas_pool_get_array(tend_physics, 'tend_rho_physics', tend_rho_physics)
-      tend_rho_physics(:,nCells+1) = 0.0_RKIND
       call mpas_pool_get_array(tend_physics, 'tend_ru_physics', tend_ru_physics)
+      !$acc kernels ACC_DEFAULT_ARG
+      tend_rtheta_physics(:,nCells+1) = 0.0_RKIND
+      tend_rho_physics(:,nCells+1) = 0.0_RKIND
       tend_ru_physics(:,nEdges+1) = 0.0_RKIND
+      !$acc end kernels
 
       !
       ! Initialize RK weights
