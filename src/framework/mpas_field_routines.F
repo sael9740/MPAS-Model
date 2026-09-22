@@ -2396,6 +2396,13 @@ module mpas_field_routines
                f_next => f_cursor % next
 
                if (associated(f_cursor % array)) then
+#ifdef ACC_DEVICE_RESIDENT
+                   ! Matches the enter data create that made this array resident at
+                   ! allocation (mpas_block_creator_allocate_pool_fields for persistent
+                   ! pool fields, mpas_allocate_scratch_field for scratch ones): release
+                   ! the device copy immediately before the host allocation goes away.
+                   !$acc exit data delete(f_cursor % array)
+#endif
                    deallocate(f_cursor % array)
                end if
 
@@ -2446,6 +2453,13 @@ module mpas_field_routines
                f_next => f_cursor % next
 
                if (associated(f_cursor % array)) then
+#ifdef ACC_DEVICE_RESIDENT
+                   ! Matches the enter data create that made this array resident at
+                   ! allocation (mpas_block_creator_allocate_pool_fields for persistent
+                   ! pool fields, mpas_allocate_scratch_field for scratch ones): release
+                   ! the device copy immediately before the host allocation goes away.
+                   !$acc exit data delete(f_cursor % array)
+#endif
                    deallocate(f_cursor % array)
                end if
 
@@ -2496,6 +2510,13 @@ module mpas_field_routines
                f_next => f_cursor % next
 
                if (associated(f_cursor % array)) then
+#ifdef ACC_DEVICE_RESIDENT
+                   ! Matches the enter data create that made this array resident at
+                   ! allocation (mpas_block_creator_allocate_pool_fields for persistent
+                   ! pool fields, mpas_allocate_scratch_field for scratch ones): release
+                   ! the device copy immediately before the host allocation goes away.
+                   !$acc exit data delete(f_cursor % array)
+#endif
                    deallocate(f_cursor % array)
                end if
 
@@ -2592,6 +2613,13 @@ module mpas_field_routines
                f_next => f_cursor % next
 
                if (associated(f_cursor % array)) then
+#ifdef ACC_DEVICE_RESIDENT
+                   ! Matches the enter data create that made this array resident at
+                   ! allocation (mpas_block_creator_allocate_pool_fields for persistent
+                   ! pool fields, mpas_allocate_scratch_field for scratch ones): release
+                   ! the device copy immediately before the host allocation goes away.
+                   !$acc exit data delete(f_cursor % array)
+#endif
                    deallocate(f_cursor % array)
                end if
 
@@ -2642,6 +2670,13 @@ module mpas_field_routines
                f_next => f_cursor % next
 
                if (associated(f_cursor % array)) then
+#ifdef ACC_DEVICE_RESIDENT
+                   ! Matches the enter data create that made this array resident at
+                   ! allocation (mpas_block_creator_allocate_pool_fields for persistent
+                   ! pool fields, mpas_allocate_scratch_field for scratch ones): release
+                   ! the device copy immediately before the host allocation goes away.
+                   !$acc exit data delete(f_cursor % array)
+#endif
                    deallocate(f_cursor % array)
                end if
 
@@ -2692,6 +2727,13 @@ module mpas_field_routines
                f_next => f_cursor % next
 
                if (associated(f_cursor % array)) then
+#ifdef ACC_DEVICE_RESIDENT
+                   ! Matches the enter data create that made this array resident at
+                   ! allocation (mpas_block_creator_allocate_pool_fields for persistent
+                   ! pool fields, mpas_allocate_scratch_field for scratch ones): release
+                   ! the device copy immediately before the host allocation goes away.
+                   !$acc exit data delete(f_cursor % array)
+#endif
                    deallocate(f_cursor % array)
                end if
 
@@ -2742,6 +2784,13 @@ module mpas_field_routines
                f_next => f_cursor % next
 
                if (associated(f_cursor % array)) then
+#ifdef ACC_DEVICE_RESIDENT
+                   ! Matches the enter data create that made this array resident at
+                   ! allocation (mpas_block_creator_allocate_pool_fields for persistent
+                   ! pool fields, mpas_allocate_scratch_field for scratch ones): release
+                   ! the device copy immediately before the host allocation goes away.
+                   !$acc exit data delete(f_cursor % array)
+#endif
                    deallocate(f_cursor % array)
                end if
 
@@ -2792,6 +2841,13 @@ module mpas_field_routines
                f_next => f_cursor % next
 
                if (associated(f_cursor % array)) then
+#ifdef ACC_DEVICE_RESIDENT
+                   ! Matches the enter data create that made this array resident at
+                   ! allocation (mpas_block_creator_allocate_pool_fields for persistent
+                   ! pool fields, mpas_allocate_scratch_field for scratch ones): release
+                   ! the device copy immediately before the host allocation goes away.
+                   !$acc exit data delete(f_cursor % array)
+#endif
                    deallocate(f_cursor % array)
                end if
 
