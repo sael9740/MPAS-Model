@@ -6,12 +6,11 @@
 ! distributed with this code, or at http://mpas-dev.github.com/license.html
 !
 
-! TODO(gpu-resident-io): the explicit "!$acc update self" in atm_compute_output_diagnostics is
-! a manual stand-in for a generic "update self before stream write" hook on MPAS_writeStream.
-! The stream manager is pure host code with no OpenACC awareness, so a device-computed field
-! must currently be published by hand at its point of use. Remove this macro and that update
-! once such a hook exists, together with the matching redundant syncs for theta/rho/pressure
-! in mpas_atm_dynamics_state_update_self (mpas_atm_time_integration.F).
+! The generic "update self before stream write" hook now exists: update_all_fields in
+! mpas_stream_manager.F fetches every field of a stream from the device before the write.
+! The explicit update self in atm_compute_output_diagnostics below is therefore redundant, and
+! is retained only because that routine is also reachable from the pre-loop initial-output
+! path; removing it has not been separately verified.
 #define GPU_RESIDENT_IO_TODO(X)
 
 module atm_core
@@ -662,7 +661,6 @@ module atm_core
       use mpas_timer, only : mpas_timer_start, mpas_timer_stop
       use mpas_atm_boundaries, only : mpas_atm_update_bdy_tend
       use mpas_atm_diagnostics_manager, only : mpas_atm_diag_update, mpas_atm_diag_compute, mpas_atm_diag_reset
-      use atm_time_integration, only : mpas_atm_dynamics_state_update_self
 
       implicit none
    
@@ -872,10 +870,6 @@ module atm_core
          !
          call mpas_get_time(curr_time=currTime, dateTimeString=timeStamp, ierr=ierr)
          if (MPAS_stream_mgr_ringing_alarms(domain % streamManager, direction=MPAS_STREAM_OUTPUT, ierr=ierr)) then
-           ! Dynamics state now stays device-resident across timesteps (see
-           ! mpas_atm_dynamics_state_init); pull the host-visible subset back before
-           ! computing/writing output-stream fields that read it on the host.
-           call mpas_atm_dynamics_state_update_self(domain)
            block_ptr => domain % blocklist
            do while (associated(block_ptr))
               call mpas_pool_get_subpool(block_ptr % structs, 'state', state)
