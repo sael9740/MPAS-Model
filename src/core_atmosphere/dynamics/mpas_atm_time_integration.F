@@ -14,6 +14,16 @@
 #define MPAS_ACC_TIMER_STOP(X)
 #endif
 
+! TODO(gpu-resident-io): diag % theta, rho and pressure are computed on the device by
+! atm_compute_output_diagnostics (mpas_atm_core.F), which publishes them to the host itself
+! for the history stream. Pulling them here as well is redundant: this routine runs before
+! that computation, so the values it fetches are immediately superseded. They are retained
+! only until the stream manager gains a generic "update self before stream write" hook, at
+! which point both this sync and the explicit one in atm_compute_output_diagnostics should
+! be removed together. Until then, removing these in isolation would be safe but would leave
+! the two halves of the same mechanism looking inconsistent.
+#define GPU_RESIDENT_IO_TODO(X)
+
 module atm_time_integration
 
    use mpas_pool_routines
@@ -891,8 +901,10 @@ module atm_time_integration
       call mpas_pool_get_array(diag, 'rho_base', rho_base)
       !$acc update self(rho_base)
       call mpas_pool_get_array(diag, 'rho', rho)
+      GPU_RESIDENT_IO_TODO(rho is recomputed and published by atm_compute_output_diagnostics; redundant here)
       !$acc update self(rho)
       call mpas_pool_get_array(diag, 'theta', theta)
+      GPU_RESIDENT_IO_TODO(theta is recomputed and published by atm_compute_output_diagnostics; redundant here)
       !$acc update self(theta)
       call mpas_pool_get_array(diag, 'theta_base', theta_base)
       !$acc update self(theta_base)
@@ -907,6 +919,7 @@ module atm_time_integration
       call mpas_pool_get_array(diag, 'pressure_base', pressure_base)
       !$acc update self(pressure_base)
       call mpas_pool_get_array(diag, 'pressure', pressure)
+      GPU_RESIDENT_IO_TODO(pressure is recomputed and published by atm_compute_output_diagnostics; redundant here)
       !$acc update self(pressure)
       call mpas_pool_get_array(diag, 'v', v)
       !$acc update self(v)

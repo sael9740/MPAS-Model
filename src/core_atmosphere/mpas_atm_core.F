@@ -5,6 +5,15 @@
 ! Additional copyright and license information can be found in the LICENSE file
 ! distributed with this code, or at http://mpas-dev.github.com/license.html
 !
+
+! TODO(gpu-resident-io): the explicit "!$acc update self" in atm_compute_output_diagnostics is
+! a manual stand-in for a generic "update self before stream write" hook on MPAS_writeStream.
+! The stream manager is pure host code with no OpenACC awareness, so a device-computed field
+! must currently be published by hand at its point of use. Remove this macro and that update
+! once such a hook exists, together with the matching redundant syncs for theta/rho/pressure
+! in mpas_atm_dynamics_state_update_self (mpas_atm_time_integration.F).
+#define GPU_RESIDENT_IO_TODO(X)
+
 module atm_core
 
    use mpas_derived_types
@@ -1018,6 +1027,7 @@ module atm_core
       ! host. if_present keeps the same line correct in the hybrid build, where the
       ! fields were never made resident and the compute construct's implicit data
       ! region has already copied them out.
+      GPU_RESIDENT_IO_TODO(hand-published for the history stream; the stream manager has no device awareness)
       !$acc update self(theta, rho, pressure) if_present
 
    end subroutine atm_compute_output_diagnostics
