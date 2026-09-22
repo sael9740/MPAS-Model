@@ -1547,6 +1547,109 @@ module mpas_block_creator
 
 !***********************************************************************
 !
+!  block_creator_set_default_* routines
+!
+!> \brief   Assign a persistent field's default value.
+!> \details
+!>  These take the field's array and defaultValue as plain dummy arguments,
+!>  rather than working with `field % array`/`field % defaultValue`
+!>  directly, so the array reference inside the "!$acc kernels" region is a
+!>  simple array, not a derived-type member access.
+!>
+!>  The assignment is wrapped in an "!$acc kernels" region with an explicit
+!>  copyout(array) clause, and works correctly without any ACC_DEVICE_RESIDENT
+!>  or MPAS_OPENACC preprocessing:
+!>    - Built without OpenACC at all: the "!$acc" lines are ignored, and this
+!>      is just a plain host assignment.
+!>    - Built with OpenACC but not GPU-resident (no persistent device presence
+!>      for this array yet): the kernels region establishes a transient device
+!>      presence, computes the default value on the device, copies the result
+!>      back to the host, and removes the transient presence when the region
+!>      ends. copyout (rather than the default copy) avoids uselessly copying
+!>      the not-yet-initialized array to the device first.
+!>    - Built with OpenACC and GPU-resident, called after the caller has
+!>      already given this array a persistent device presence via
+!>      "!$acc enter data create": the array is already present, so entering
+!>      the region performs no data movement, the default value is computed
+!>      directly on the device, and copyout is a no-op (the persistent
+!>      reference from the caller keeps the array resident) -- the host copy
+!>      is left as-is and is refreshed later at the appropriate I/O boundary.
+!
+!-----------------------------------------------------------------------
+   subroutine block_creator_set_default_1d_real(array, defaultValue)!{{{
+      real (kind=RKIND), dimension(:) :: array
+      real (kind=RKIND), intent(in) :: defaultValue
+
+      !$acc kernels copyout(array)
+      array(:) = defaultValue
+      !$acc end kernels
+   end subroutine block_creator_set_default_1d_real!}}}
+
+   subroutine block_creator_set_default_2d_real(array, defaultValue)!{{{
+      real (kind=RKIND), dimension(:,:) :: array
+      real (kind=RKIND), intent(in) :: defaultValue
+
+      !$acc kernels copyout(array)
+      array(:,:) = defaultValue
+      !$acc end kernels
+   end subroutine block_creator_set_default_2d_real!}}}
+
+   subroutine block_creator_set_default_3d_real(array, defaultValue)!{{{
+      real (kind=RKIND), dimension(:,:,:) :: array
+      real (kind=RKIND), intent(in) :: defaultValue
+
+      !$acc kernels copyout(array)
+      array(:,:,:) = defaultValue
+      !$acc end kernels
+   end subroutine block_creator_set_default_3d_real!}}}
+
+   subroutine block_creator_set_default_4d_real(array, defaultValue)!{{{
+      real (kind=RKIND), dimension(:,:,:,:) :: array
+      real (kind=RKIND), intent(in) :: defaultValue
+
+      !$acc kernels copyout(array)
+      array(:,:,:,:) = defaultValue
+      !$acc end kernels
+   end subroutine block_creator_set_default_4d_real!}}}
+
+   subroutine block_creator_set_default_5d_real(array, defaultValue)!{{{
+      real (kind=RKIND), dimension(:,:,:,:,:) :: array
+      real (kind=RKIND), intent(in) :: defaultValue
+
+      !$acc kernels copyout(array)
+      array(:,:,:,:,:) = defaultValue
+      !$acc end kernels
+   end subroutine block_creator_set_default_5d_real!}}}
+
+   subroutine block_creator_set_default_1d_int(array, defaultValue)!{{{
+      integer, dimension(:) :: array
+      integer, intent(in) :: defaultValue
+
+      !$acc kernels copyout(array)
+      array(:) = defaultValue
+      !$acc end kernels
+   end subroutine block_creator_set_default_1d_int!}}}
+
+   subroutine block_creator_set_default_2d_int(array, defaultValue)!{{{
+      integer, dimension(:,:) :: array
+      integer, intent(in) :: defaultValue
+
+      !$acc kernels copyout(array)
+      array(:,:) = defaultValue
+      !$acc end kernels
+   end subroutine block_creator_set_default_2d_int!}}}
+
+   subroutine block_creator_set_default_3d_int(array, defaultValue)!{{{
+      integer, dimension(:,:,:) :: array
+      integer, intent(in) :: defaultValue
+
+      !$acc kernels copyout(array)
+      array(:,:,:) = defaultValue
+      !$acc end kernels
+   end subroutine block_creator_set_default_3d_int!}}}
+
+!***********************************************************************
+!
 !  routine mpas_block_creator_allocate_pool_fields
 !
 !> \brief   Pool field allocator
@@ -1646,9 +1749,12 @@ module mpas_block_creator
                               ierr = 1
                               return
                            end if
+#ifdef ACC_DEVICE_RESIDENT
+                           !$acc enter data create(real1DField % array)
+#endif
                            allocated_bytes = allocated_bytes + field_bytes
                            REPORT_TOTAL_ALLOCATION(allocated_bytes)
-                           real1DField % array(:) = real1DField % defaultValue
+                           call block_creator_set_default_1d_real(real1DField % array, real1DField % defaultValue)
                         end if
                      end if
                   end do
@@ -1677,9 +1783,12 @@ module mpas_block_creator
                               ierr = 1
                               return
                            end if
+#ifdef ACC_DEVICE_RESIDENT
+                           !$acc enter data create(real2DField % array)
+#endif
                            allocated_bytes = allocated_bytes + field_bytes
                            REPORT_TOTAL_ALLOCATION(allocated_bytes)
-                           real2DField % array(:,:) = real2DField % defaultValue
+                           call block_creator_set_default_2d_real(real2DField % array, real2DField % defaultValue)
                         end if
                      end if
                   end do
@@ -1710,9 +1819,12 @@ module mpas_block_creator
                               ierr = 1
                               return
                            end if
+#ifdef ACC_DEVICE_RESIDENT
+                           !$acc enter data create(real3DField % array)
+#endif
                            allocated_bytes = allocated_bytes + field_bytes
                            REPORT_TOTAL_ALLOCATION(allocated_bytes)
-                           real3DField % array(:,:,:) = real3DField % defaultValue
+                           call block_creator_set_default_3d_real(real3DField % array, real3DField % defaultValue)
                         end if
                      end if
                   end do
@@ -1745,9 +1857,12 @@ module mpas_block_creator
                               ierr = 1
                               return
                            end if
+#ifdef ACC_DEVICE_RESIDENT
+                           !$acc enter data create(real4DField % array)
+#endif
                            allocated_bytes = allocated_bytes + field_bytes
                            REPORT_TOTAL_ALLOCATION(allocated_bytes)
-                           real4DField % array(:,:,:,:) = real4DField % defaultValue
+                           call block_creator_set_default_4d_real(real4DField % array, real4DField % defaultValue)
                         end if
                      end if
                   end do
@@ -1781,9 +1896,12 @@ module mpas_block_creator
                               ierr = 1
                               return
                            end if
+#ifdef ACC_DEVICE_RESIDENT
+                           !$acc enter data create(real5DField % array)
+#endif
                            allocated_bytes = allocated_bytes + field_bytes
                            REPORT_TOTAL_ALLOCATION(allocated_bytes)
-                           real5DField % array(:,:,:,:,:) = real5DField % defaultValue
+                           call block_creator_set_default_5d_real(real5DField % array, real5DField % defaultValue)
                         end if
                      end if
                   end do
@@ -1812,9 +1930,12 @@ module mpas_block_creator
                               ierr = 1
                               return
                            end if
+#ifdef ACC_DEVICE_RESIDENT
+                           !$acc enter data create(int1DField % array)
+#endif
                            allocated_bytes = allocated_bytes + field_bytes
                            REPORT_TOTAL_ALLOCATION(allocated_bytes)
-                           int1DField % array(:) = int1DField % defaultValue
+                           call block_creator_set_default_1d_int(int1DField % array, int1DField % defaultValue)
                         end if
                      end if
                   end do
@@ -1843,9 +1964,12 @@ module mpas_block_creator
                               ierr = 1
                               return
                            end if
+#ifdef ACC_DEVICE_RESIDENT
+                           !$acc enter data create(int2DField % array)
+#endif
                            allocated_bytes = allocated_bytes + field_bytes
                            REPORT_TOTAL_ALLOCATION(allocated_bytes)
-                           int2DField % array(:,:) = int2DField % defaultValue
+                           call block_creator_set_default_2d_int(int2DField % array, int2DField % defaultValue)
                         end if
                      end if
                   end do
@@ -1876,9 +2000,12 @@ module mpas_block_creator
                               ierr = 1
                               return
                            end if
+#ifdef ACC_DEVICE_RESIDENT
+                           !$acc enter data create(int3DField % array)
+#endif
                            allocated_bytes = allocated_bytes + field_bytes
                            REPORT_TOTAL_ALLOCATION(allocated_bytes)
-                           int3DField % array(:,:,:) = int3DField % defaultValue
+                           call block_creator_set_default_3d_int(int3DField % array, int3DField % defaultValue)
                         end if
                      end if
                   end do
