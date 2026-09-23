@@ -145,7 +145,7 @@ module mpas_field_routines
        type (field1dInteger), pointer :: f_cursor
        integer :: threadNum
        integer :: i
-#ifdef ACC_DEVICE_RESIDENT
+#ifdef MPAS_OPENACC
        integer, dimension(:), pointer :: arr
        integer :: defaultVal
        integer :: d1
@@ -196,13 +196,16 @@ module mpas_field_routines
          if ( init_array ) then
          f_cursor => f
          do while(associated(f_cursor))
-#ifdef ACC_DEVICE_RESIDENT
-           ! With the field device-resident, filling it on the host would be wasted
-           ! work: nothing reads that host copy before the device copy is written, and
-           ! this loop is serial whenever OpenMP is off. The array is aliased to a local
-           ! pointer and the bounds/default value to local scalars first, because every
-           ! ported compute construct in MPAS names plain locals rather than derived-type
-           ! components: referencing f_cursor % array inside the kernel would additionally
+#ifdef MPAS_OPENACC
+           ! Filled with a compute construct in every OpenACC build, resident or not.
+           ! Under residency the array is already present and this writes the device copy
+           ! directly. Without residency the construct's implicit data region still keeps
+           ! the fill on the device, which matters: filling a large scratch array on the
+           ! host is a write that every following kernel immediately pulls back, and under
+           ! managed memory that ping-pong dominated atm_advance_scalars_mono.
+           ! A build without OpenACC keeps the original OpenMP host loop below.
+           ! The array is aliased to a local pointer and the bounds/default value to local
+           ! scalars first, because referencing f_cursor % array inside the kernel would
            ! require the field type itself to be device-resident and attached (mpas_halo.F
            ! is the one place that needs that, and pays for it with enter data + attach).
            arr => f_cursor % array
@@ -265,7 +268,7 @@ module mpas_field_routines
        type (field2dInteger), pointer :: f_cursor
        integer :: threadNum
        integer :: i,j
-#ifdef ACC_DEVICE_RESIDENT
+#ifdef MPAS_OPENACC
        integer, dimension(:,:), pointer :: arr
        integer :: defaultVal
        integer :: d1, d2
@@ -316,13 +319,16 @@ module mpas_field_routines
          if ( init_array ) then
          f_cursor => f
          do while(associated(f_cursor))
-#ifdef ACC_DEVICE_RESIDENT
-           ! With the field device-resident, filling it on the host would be wasted
-           ! work: nothing reads that host copy before the device copy is written, and
-           ! this loop is serial whenever OpenMP is off. The array is aliased to a local
-           ! pointer and the bounds/default value to local scalars first, because every
-           ! ported compute construct in MPAS names plain locals rather than derived-type
-           ! components: referencing f_cursor % array inside the kernel would additionally
+#ifdef MPAS_OPENACC
+           ! Filled with a compute construct in every OpenACC build, resident or not.
+           ! Under residency the array is already present and this writes the device copy
+           ! directly. Without residency the construct's implicit data region still keeps
+           ! the fill on the device, which matters: filling a large scratch array on the
+           ! host is a write that every following kernel immediately pulls back, and under
+           ! managed memory that ping-pong dominated atm_advance_scalars_mono.
+           ! A build without OpenACC keeps the original OpenMP host loop below.
+           ! The array is aliased to a local pointer and the bounds/default value to local
+           ! scalars first, because referencing f_cursor % array inside the kernel would
            ! require the field type itself to be device-resident and attached (mpas_halo.F
            ! is the one place that needs that, and pays for it with enter data + attach).
            arr => f_cursor % array
@@ -392,7 +398,7 @@ module mpas_field_routines
        type (field3dInteger), pointer :: f_cursor
        integer :: threadNum
        integer :: i,j,k
-#ifdef ACC_DEVICE_RESIDENT
+#ifdef MPAS_OPENACC
        integer, dimension(:,:,:), pointer :: arr
        integer :: defaultVal
        integer :: d1, d2, d3
@@ -441,13 +447,16 @@ module mpas_field_routines
          if ( init_array ) then
          f_cursor => f
          do while(associated(f_cursor))
-#ifdef ACC_DEVICE_RESIDENT
-           ! With the field device-resident, filling it on the host would be wasted
-           ! work: nothing reads that host copy before the device copy is written, and
-           ! this loop is serial whenever OpenMP is off. The array is aliased to a local
-           ! pointer and the bounds/default value to local scalars first, because every
-           ! ported compute construct in MPAS names plain locals rather than derived-type
-           ! components: referencing f_cursor % array inside the kernel would additionally
+#ifdef MPAS_OPENACC
+           ! Filled with a compute construct in every OpenACC build, resident or not.
+           ! Under residency the array is already present and this writes the device copy
+           ! directly. Without residency the construct's implicit data region still keeps
+           ! the fill on the device, which matters: filling a large scratch array on the
+           ! host is a write that every following kernel immediately pulls back, and under
+           ! managed memory that ping-pong dominated atm_advance_scalars_mono.
+           ! A build without OpenACC keeps the original OpenMP host loop below.
+           ! The array is aliased to a local pointer and the bounds/default value to local
+           ! scalars first, because referencing f_cursor % array inside the kernel would
            ! require the field type itself to be device-resident and attached (mpas_halo.F
            ! is the one place that needs that, and pays for it with enter data + attach).
            arr => f_cursor % array
@@ -522,7 +531,7 @@ module mpas_field_routines
        type (field1dReal), pointer :: f_cursor
        integer :: threadNum
        integer :: i
-#ifdef ACC_DEVICE_RESIDENT
+#ifdef MPAS_OPENACC
        real (kind=RKIND), dimension(:), pointer :: arr
        real (kind=RKIND) :: defaultVal
        integer :: d1
@@ -573,13 +582,16 @@ module mpas_field_routines
          if ( init_array ) then
          f_cursor => f
          do while(associated(f_cursor))
-#ifdef ACC_DEVICE_RESIDENT
-           ! With the field device-resident, filling it on the host would be wasted
-           ! work: nothing reads that host copy before the device copy is written, and
-           ! this loop is serial whenever OpenMP is off. The array is aliased to a local
-           ! pointer and the bounds/default value to local scalars first, because every
-           ! ported compute construct in MPAS names plain locals rather than derived-type
-           ! components: referencing f_cursor % array inside the kernel would additionally
+#ifdef MPAS_OPENACC
+           ! Filled with a compute construct in every OpenACC build, resident or not.
+           ! Under residency the array is already present and this writes the device copy
+           ! directly. Without residency the construct's implicit data region still keeps
+           ! the fill on the device, which matters: filling a large scratch array on the
+           ! host is a write that every following kernel immediately pulls back, and under
+           ! managed memory that ping-pong dominated atm_advance_scalars_mono.
+           ! A build without OpenACC keeps the original OpenMP host loop below.
+           ! The array is aliased to a local pointer and the bounds/default value to local
+           ! scalars first, because referencing f_cursor % array inside the kernel would
            ! require the field type itself to be device-resident and attached (mpas_halo.F
            ! is the one place that needs that, and pays for it with enter data + attach).
            arr => f_cursor % array
@@ -642,7 +654,7 @@ module mpas_field_routines
        type (field2dReal), pointer :: f_cursor
        integer :: threadNum
        integer :: i,j
-#ifdef ACC_DEVICE_RESIDENT
+#ifdef MPAS_OPENACC
        real (kind=RKIND), dimension(:,:), pointer :: arr
        real (kind=RKIND) :: defaultVal
        integer :: d1, d2
@@ -693,13 +705,16 @@ module mpas_field_routines
          if ( init_array ) then
          f_cursor => f
          do while(associated(f_cursor))
-#ifdef ACC_DEVICE_RESIDENT
-           ! With the field device-resident, filling it on the host would be wasted
-           ! work: nothing reads that host copy before the device copy is written, and
-           ! this loop is serial whenever OpenMP is off. The array is aliased to a local
-           ! pointer and the bounds/default value to local scalars first, because every
-           ! ported compute construct in MPAS names plain locals rather than derived-type
-           ! components: referencing f_cursor % array inside the kernel would additionally
+#ifdef MPAS_OPENACC
+           ! Filled with a compute construct in every OpenACC build, resident or not.
+           ! Under residency the array is already present and this writes the device copy
+           ! directly. Without residency the construct's implicit data region still keeps
+           ! the fill on the device, which matters: filling a large scratch array on the
+           ! host is a write that every following kernel immediately pulls back, and under
+           ! managed memory that ping-pong dominated atm_advance_scalars_mono.
+           ! A build without OpenACC keeps the original OpenMP host loop below.
+           ! The array is aliased to a local pointer and the bounds/default value to local
+           ! scalars first, because referencing f_cursor % array inside the kernel would
            ! require the field type itself to be device-resident and attached (mpas_halo.F
            ! is the one place that needs that, and pays for it with enter data + attach).
            arr => f_cursor % array
@@ -767,7 +782,7 @@ module mpas_field_routines
        type (field3dReal), pointer :: f_cursor
        integer :: threadNum
        integer :: i,j,k
-#ifdef ACC_DEVICE_RESIDENT
+#ifdef MPAS_OPENACC
        real (kind=RKIND), dimension(:,:,:), pointer :: arr
        real (kind=RKIND) :: defaultVal
        integer :: d1, d2, d3
@@ -816,16 +831,18 @@ module mpas_field_routines
          if ( init_array ) then
          f_cursor => f
          do while(associated(f_cursor))
-#ifdef ACC_DEVICE_RESIDENT
-           ! With the field device-resident, filling it on the host would be wasted work:
-           ! nothing reads that host copy before the device copy is overwritten, and this
-           ! loop is serial whenever OpenMP is off -- for a field the size of 'scale' that
-           ! is millions of elements per call. The array is aliased to a local pointer and
-           ! the bounds/default value to local scalars first, because every ported compute
-           ! construct in MPAS names plain locals rather than derived-type components:
-           ! referencing f_cursor % array inside the kernel would additionally require the
-           ! field type itself to be device-resident and attached (mpas_halo.F is the one
-           ! place that needs that, and it pays for it with enter data copyin + attach).
+#ifdef MPAS_OPENACC
+           ! Filled with a compute construct in every OpenACC build, resident or not.
+           ! Under residency the array is already present and this writes the device copy
+           ! directly. Without residency the construct's implicit data region still keeps
+           ! the fill on the device, which matters: filling a large scratch array on the
+           ! host is a write that every following kernel immediately pulls back, and under
+           ! managed memory that ping-pong dominated atm_advance_scalars_mono.
+           ! A build without OpenACC keeps the original OpenMP host loop below.
+           ! The array is aliased to a local pointer and the bounds/default value to local
+           ! scalars first, because referencing f_cursor % array inside the kernel would
+           ! require the field type itself to be device-resident and attached (mpas_halo.F
+           ! is the one place that needs that, and pays for it with enter data + attach).
            arr => f_cursor % array
            defaultVal = f_cursor % defaultValue
            d1 = f_cursor % dimSizes(1)
@@ -898,7 +915,7 @@ module mpas_field_routines
        type (field4dReal), pointer :: f_cursor
        integer :: threadNum
        integer :: i,j,k,l
-#ifdef ACC_DEVICE_RESIDENT
+#ifdef MPAS_OPENACC
        real (kind=RKIND), dimension(:,:,:,:), pointer :: arr
        real (kind=RKIND) :: defaultVal
        integer :: d1, d2, d3, d4
@@ -947,13 +964,16 @@ module mpas_field_routines
          if ( init_array ) then
          f_cursor => f
          do while(associated(f_cursor))
-#ifdef ACC_DEVICE_RESIDENT
-           ! With the field device-resident, filling it on the host would be wasted
-           ! work: nothing reads that host copy before the device copy is written, and
-           ! this loop is serial whenever OpenMP is off. The array is aliased to a local
-           ! pointer and the bounds/default value to local scalars first, because every
-           ! ported compute construct in MPAS names plain locals rather than derived-type
-           ! components: referencing f_cursor % array inside the kernel would additionally
+#ifdef MPAS_OPENACC
+           ! Filled with a compute construct in every OpenACC build, resident or not.
+           ! Under residency the array is already present and this writes the device copy
+           ! directly. Without residency the construct's implicit data region still keeps
+           ! the fill on the device, which matters: filling a large scratch array on the
+           ! host is a write that every following kernel immediately pulls back, and under
+           ! managed memory that ping-pong dominated atm_advance_scalars_mono.
+           ! A build without OpenACC keeps the original OpenMP host loop below.
+           ! The array is aliased to a local pointer and the bounds/default value to local
+           ! scalars first, because referencing f_cursor % array inside the kernel would
            ! require the field type itself to be device-resident and attached (mpas_halo.F
            ! is the one place that needs that, and pays for it with enter data + attach).
            arr => f_cursor % array
@@ -1035,7 +1055,7 @@ module mpas_field_routines
        type (field5dReal), pointer :: f_cursor
        integer :: threadNum
        integer :: i,j,k,l,m
-#ifdef ACC_DEVICE_RESIDENT
+#ifdef MPAS_OPENACC
        real (kind=RKIND), dimension(:,:,:,:,:), pointer :: arr
        real (kind=RKIND) :: defaultVal
        integer :: d1, d2, d3, d4, d5
@@ -1084,13 +1104,16 @@ module mpas_field_routines
          if ( init_array ) then
          f_cursor => f
          do while(associated(f_cursor))
-#ifdef ACC_DEVICE_RESIDENT
-           ! With the field device-resident, filling it on the host would be wasted
-           ! work: nothing reads that host copy before the device copy is written, and
-           ! this loop is serial whenever OpenMP is off. The array is aliased to a local
-           ! pointer and the bounds/default value to local scalars first, because every
-           ! ported compute construct in MPAS names plain locals rather than derived-type
-           ! components: referencing f_cursor % array inside the kernel would additionally
+#ifdef MPAS_OPENACC
+           ! Filled with a compute construct in every OpenACC build, resident or not.
+           ! Under residency the array is already present and this writes the device copy
+           ! directly. Without residency the construct's implicit data region still keeps
+           ! the fill on the device, which matters: filling a large scratch array on the
+           ! host is a write that every following kernel immediately pulls back, and under
+           ! managed memory that ping-pong dominated atm_advance_scalars_mono.
+           ! A build without OpenACC keeps the original OpenMP host loop below.
+           ! The array is aliased to a local pointer and the bounds/default value to local
+           ! scalars first, because referencing f_cursor % array inside the kernel would
            ! require the field type itself to be device-resident and attached (mpas_halo.F
            ! is the one place that needs that, and pays for it with enter data + attach).
            arr => f_cursor % array
