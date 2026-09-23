@@ -1930,7 +1930,9 @@ module atm_time_integration
 
       if (config_split_dynamics_transport) then
          allocate(rho_zz_int(nVertLevels,nCells+1))
+         !$acc kernels ACC_DEFAULT_ARG
          rho_zz_int(:,nCells+1) = 0.0_RKIND
+         !$acc end kernels
       else
          allocate(rho_zz_int(1,1))
       end if
