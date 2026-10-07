@@ -544,6 +544,7 @@ module mpas_halo
         use mpi
 #endif
         use mpas_derived_types, only : domain_type, mpas_halo_group, MPAS_HALO_REAL, MPAS_LOG_CRIT
+        use mpas_kind_types, only : RKIND
         use mpas_pool_routines, only : mpas_pool_get_array
         use mpas_log, only : mpas_log_write
 
@@ -594,6 +595,16 @@ module mpas_halo
         integer :: maxNRecvList
         integer, dimension(:,:,:), CONTIGUOUS pointer :: recvListSrc, recvListDst
         integer, dimension(:), CONTIGUOUS pointer :: unpackOffsets
+        ! Local aliases for the field arrays, hoisted in the same way as the send and
+        ! recv lists above. Referencing group % fields(i) % rNarr inside a compute
+        ! construct makes both the kernel's dereference and the matching attach/detach
+        ! write land on the managed-memory descriptor page of the derived type, so under
+        ! -gpu=mem:managed that page migrates host->device and back once per field per
+        ! exchange. A local pointer descriptor lives in ordinary host memory, so neither
+        ! half of that round trip happens.
+        real (kind=RKIND), dimension(:), pointer :: r1arr
+        real (kind=RKIND), dimension(:,:), pointer :: r2arr
+        real (kind=RKIND), dimension(:,:,:), pointer :: r3arr
 
 
         if (present(iErr)) then
@@ -705,11 +716,12 @@ module mpas_halo
                 case (1)
                     call mpas_pool_get_array(domain % blocklist % allFields, trim(group % fields(i) % fieldName), &
                                              group % fields(i) % r1arr, timeLevel=group % fields(i) % timeLevel)
+                    r1arr => group % fields(i) % r1arr
 
                     !
                     ! Pack send buffer for all neighbors for current field
                     !
-                    !$acc parallel ACC_DEFAULT_ARG attach(group % fields(i) % r1arr) if(useGPUAwareMPI)
+                    !$acc parallel ACC_DEFAULT_ARG if(useGPUAwareMPI)
                     !$acc loop gang collapse(2)
                     do iEndp = 1, nSendEndpts
                         do iHalo = 1, nHalos
@@ -717,7 +729,7 @@ module mpas_halo
                             do j = 1, maxNSendList
                                 if (j <= nSendLists(iHalo,iEndp)) then
                                     sbuf(packOffsets(iEndp) + sendListDst(j,iHalo,iEndp)) = &
-                                        group % fields(i) % r1arr(sendListSrc(j,iHalo,iEndp))
+                                        r1arr(sendListSrc(j,iHalo,iEndp))
                                 end if
                             end do
                         end do
@@ -730,6 +742,7 @@ module mpas_halo
                 case (2)
                     call mpas_pool_get_array(domain % blocklist % allFields, trim(group % fields(i) % fieldName), &
                                              group % fields(i) % r2arr, timeLevel=group % fields(i) % timeLevel)
+                    r2arr => group % fields(i) % r2arr
 
                     !
                     ! Pack send buffer for all neighbors for current field
@@ -738,7 +751,7 @@ module mpas_halo
                     ! Present should also cause an attach action. OpenACC Spec2.7 Section 2.7.2 describes 'attach action'
                     ! !$acc data present(group) present(group % fields(i)) present(sbuf(:), group % fields(i) % sendListSrc(:,:,:))
 
-                    !$acc parallel ACC_DEFAULT_ARG attach(group % fields(i) % r2arr) if(useGPUAwareMPI)
+                    !$acc parallel ACC_DEFAULT_ARG if(useGPUAwareMPI)
                     !$acc loop gang collapse(3)
                     do iEndp = 1, nSendEndpts
                         do iHalo = 1, nHalos
@@ -747,7 +760,7 @@ module mpas_halo
                                 do i1 = 1, dim1
                                     if (j <= nSendLists(iHalo,iEndp)) then
                                         sbuf(packOffsets(iEndp) + dim1 * (sendListDst(j,iHalo,iEndp) - 1) + i1) = &
-                                            group % fields(i) % r2arr(i1, sendListSrc(j,iHalo,iEndp))
+                                            r2arr(i1, sendListSrc(j,iHalo,iEndp))
                                     end if
                                 end do
                             end do
@@ -761,11 +774,12 @@ module mpas_halo
                 case (3)
                     call mpas_pool_get_array(domain % blocklist % allFields, trim(group % fields(i) % fieldName), &
                                              group % fields(i) % r3arr, group % fields(i) % timeLevel)
+                    r3arr => group % fields(i) % r3arr
 
                     !
                     ! Pack send buffer for all neighbors for current field
                     !
-                    !$acc parallel ACC_DEFAULT_ARG attach(group % fields(i) % r3arr) if(useGPUAwareMPI)
+                    !$acc parallel ACC_DEFAULT_ARG if(useGPUAwareMPI)
                     !$acc loop gang collapse(4)
                     do iEndp = 1, nSendEndpts
                         do iHalo = 1, nHalos
@@ -776,7 +790,7 @@ module mpas_halo
                                     if (j <= nSendLists(iHalo,iEndp)) then
                                         sbuf(packOffsets(iEndp) + dim1*dim2*(sendListDst(j,iHalo,iEndp) - 1) &
                                                         + dim1*(i2-1) + i1) = &
-                                            group % fields(i) % r3arr(i1, i2, sendListSrc(j,iHalo,iEndp))
+                                            r3arr(i1, i2, sendListSrc(j,iHalo,iEndp))
                                     end if
                                 end do
                                 end do
@@ -856,12 +870,13 @@ module mpas_halo
                         !
                         ! Unpack recv buffer from all neighbors for current field
                         !
-                        !$acc parallel ACC_DEFAULT_ARG attach(group % fields(i) % r1arr) if(useGPUAwareMPI)
+                        r1arr => group % fields(i) % r1arr
+                        !$acc parallel ACC_DEFAULT_ARG if(useGPUAwareMPI)
                         !$acc loop gang vector collapse(2)
                         do iHalo = 1, nHalos
                             do j = 1, maxNRecvList
                                 if (j <= nRecvLists(iHalo,iEndp)) then
-                                    group % fields(i) % r1arr(recvListDst(j,iHalo,iEndp)) = &
+                                    r1arr(recvListDst(j,iHalo,iEndp)) = &
                                         rbuf(unpackOffsets(iEndp) + recvListSrc(j,iHalo,iEndp))
                                 end if
                             end do
@@ -875,14 +890,15 @@ module mpas_halo
                         !
                         ! Unpack recv buffer from all neighbors for current field
                         !
-                        !$acc parallel ACC_DEFAULT_ARG attach(group % fields(i) % r2arr) if(useGPUAwareMPI)
+                        r2arr => group % fields(i) % r2arr
+                        !$acc parallel ACC_DEFAULT_ARG if(useGPUAwareMPI)
                         !$acc loop gang collapse(2)
                         do iHalo = 1, nHalos
                             do j = 1, maxNRecvList
                                 !$acc loop vector
                                 do i1 = 1, dim1
                                     if (j <= nRecvLists(iHalo,iEndp)) then
-                                        group % fields(i) % r2arr(i1, recvListDst(j,iHalo,iEndp)) = &
+                                        r2arr(i1, recvListDst(j,iHalo,iEndp)) = &
                                             rbuf(unpackOffsets(iEndp) + dim1 * (recvListSrc(j,iHalo,iEndp) - 1) + i1)
                                     end if
                                 end do
@@ -897,7 +913,8 @@ module mpas_halo
                         !
                         ! Unpack recv buffer from all neighbors for current field
                         !
-                        !$acc parallel ACC_DEFAULT_ARG attach(group % fields(i) % r3arr) if(useGPUAwareMPI)
+                        r3arr => group % fields(i) % r3arr
+                        !$acc parallel ACC_DEFAULT_ARG if(useGPUAwareMPI)
                         !$acc loop gang collapse(2)
                         do iHalo = 1, nHalos
                             do j = 1, maxNRecvList
@@ -905,7 +922,7 @@ module mpas_halo
                                 do i2 = 1, dim2
                                 do i1 = 1, dim1
                                     if (j <= nRecvLists(iHalo,iEndp)) then
-                                        group % fields(i) % r3arr(i1, i2, recvListDst(j,iHalo,iEndp)) = &
+                                        r3arr(i1, i2, recvListDst(j,iHalo,iEndp)) = &
                                             rbuf(unpackOffsets(iEndp) + dim1*dim2*(recvListSrc(j,iHalo,iEndp) - 1) &
                                                             + dim1*(i2-1) + i1)
                                     end if
