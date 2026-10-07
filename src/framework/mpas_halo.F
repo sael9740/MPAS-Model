@@ -857,9 +857,8 @@ module mpas_halo
                         ! Unpack recv buffer from all neighbors for current field
                         !
                         !$acc parallel ACC_DEFAULT_ARG attach(group % fields(i) % r1arr) if(useGPUAwareMPI)
-                        !$acc loop gang
+                        !$acc loop gang vector collapse(2)
                         do iHalo = 1, nHalos
-                            !$acc loop vector
                             do j = 1, maxNRecvList
                                 if (j <= nRecvLists(iHalo,iEndp)) then
                                     group % fields(i) % r1arr(recvListDst(j,iHalo,iEndp)) = &
@@ -877,9 +876,8 @@ module mpas_halo
                         ! Unpack recv buffer from all neighbors for current field
                         !
                         !$acc parallel ACC_DEFAULT_ARG attach(group % fields(i) % r2arr) if(useGPUAwareMPI)
-                        !$acc loop gang
+                        !$acc loop gang collapse(2)
                         do iHalo = 1, nHalos
-                            !$acc loop worker
                             do j = 1, maxNRecvList
                                 !$acc loop vector
                                 do i1 = 1, dim1
