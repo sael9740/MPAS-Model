@@ -6197,6 +6197,16 @@ module atm_time_integration
 
          ke_fact = 1.0 - .375
 
+         ! These two loops must be separate compute constructs. OpenACC places no
+         ! barrier between `loop` constructs inside one `parallel` region, so with
+         ! both in a single region a gang running the second loop can read ke(k,iCell)
+         ! before another gang has applied the ke_fact scaling in the first. The two
+         ! loops also carry different schedules -- collapse(2) over (iCell,k) versus
+         ! gang over iCell -- so the iteration-to-gang mapping genuinely differs and
+         ! the dependence is not resolved by program order within a gang.
+         !
+         ! Under OpenMP this is safe because each thread owns cellStart..cellEnd for
+         ! both loops, making the dependence thread-local; only the OpenACC path races.
          !$acc parallel ACC_DEFAULT_ARG
          !$acc loop collapse(2)
          do iCell=cellStart,cellEnd
@@ -6204,8 +6214,9 @@ module atm_time_integration
                ke(k,iCell) = ke_fact * ke(k,iCell)
             end do
          end do
+         !$acc end parallel
 
-
+         !$acc parallel ACC_DEFAULT_ARG
          !$acc loop gang
          do iCell=cellStart,cellEnd
             r = invAreaCell(iCell)
