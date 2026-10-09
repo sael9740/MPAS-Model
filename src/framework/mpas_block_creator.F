@@ -1590,6 +1590,23 @@ module mpas_block_creator
       type (field3DInteger), pointer :: int3DField
       type (field1DChar), pointer :: char1DField
 
+      ! Local aliases for the default-value fill. The fill runs on the device,
+      ! and referencing fieldN % array / % defaultValue inside the compute
+      ! construct would both require the field type itself to be mapped and
+      ! attached, and defeat parallelisation: nvfortran cannot prove the pointer
+      ! member does not alias the scalar member, so it reports a loop-carried
+      ! dependence and schedules the outer loop seq.
+      real (kind=RKIND), dimension(:), pointer :: fillR1
+      real (kind=RKIND), dimension(:,:), pointer :: fillR2
+      real (kind=RKIND), dimension(:,:,:), pointer :: fillR3
+      real (kind=RKIND), dimension(:,:,:,:), pointer :: fillR4
+      real (kind=RKIND), dimension(:,:,:,:,:), pointer :: fillR5
+      integer, dimension(:), pointer :: fillI1
+      integer, dimension(:,:), pointer :: fillI2
+      integer, dimension(:,:,:), pointer :: fillI3
+      real (kind=RKIND) :: fillDefR
+      integer :: fillDefI
+
 
       integer :: timeLev, iDim
       integer, pointer :: tempDim
@@ -1655,8 +1672,12 @@ module mpas_block_creator
 #endif
                            allocated_bytes = allocated_bytes + field_bytes
                            REPORT_TOTAL_ALLOCATION(allocated_bytes)
-                           real1DField % array(:) = real1DField % defaultValue
-                           !$acc update device(real1DField % array) if_present
+                           fillR1 => real1DField % array
+                           fillDefR = real1DField % defaultValue
+                           !$acc kernels copyout(fillR1(:))
+                           fillR1(:) = fillDefR
+                           !$acc end kernels
+                           !$acc update self(fillR1) if_present
                         end if
                      end if
                   end do
@@ -1690,8 +1711,12 @@ module mpas_block_creator
 #endif
                            allocated_bytes = allocated_bytes + field_bytes
                            REPORT_TOTAL_ALLOCATION(allocated_bytes)
-                           real2DField % array(:,:) = real2DField % defaultValue
-                           !$acc update device(real2DField % array) if_present
+                           fillR2 => real2DField % array
+                           fillDefR = real2DField % defaultValue
+                           !$acc kernels copyout(fillR2(:,:))
+                           fillR2(:,:) = fillDefR
+                           !$acc end kernels
+                           !$acc update self(fillR2) if_present
                         end if
                      end if
                   end do
@@ -1727,8 +1752,12 @@ module mpas_block_creator
 #endif
                            allocated_bytes = allocated_bytes + field_bytes
                            REPORT_TOTAL_ALLOCATION(allocated_bytes)
-                           real3DField % array(:,:,:) = real3DField % defaultValue
-                           !$acc update device(real3DField % array) if_present
+                           fillR3 => real3DField % array
+                           fillDefR = real3DField % defaultValue
+                           !$acc kernels copyout(fillR3(:,:,:))
+                           fillR3(:,:,:) = fillDefR
+                           !$acc end kernels
+                           !$acc update self(fillR3) if_present
                         end if
                      end if
                   end do
@@ -1766,8 +1795,12 @@ module mpas_block_creator
 #endif
                            allocated_bytes = allocated_bytes + field_bytes
                            REPORT_TOTAL_ALLOCATION(allocated_bytes)
-                           real4DField % array(:,:,:,:) = real4DField % defaultValue
-                           !$acc update device(real4DField % array) if_present
+                           fillR4 => real4DField % array
+                           fillDefR = real4DField % defaultValue
+                           !$acc kernels copyout(fillR4(:,:,:,:))
+                           fillR4(:,:,:,:) = fillDefR
+                           !$acc end kernels
+                           !$acc update self(fillR4) if_present
                         end if
                      end if
                   end do
@@ -1806,8 +1839,12 @@ module mpas_block_creator
 #endif
                            allocated_bytes = allocated_bytes + field_bytes
                            REPORT_TOTAL_ALLOCATION(allocated_bytes)
-                           real5DField % array(:,:,:,:,:) = real5DField % defaultValue
-                           !$acc update device(real5DField % array) if_present
+                           fillR5 => real5DField % array
+                           fillDefR = real5DField % defaultValue
+                           !$acc kernels copyout(fillR5(:,:,:,:,:))
+                           fillR5(:,:,:,:,:) = fillDefR
+                           !$acc end kernels
+                           !$acc update self(fillR5) if_present
                         end if
                      end if
                   end do
@@ -1841,8 +1878,12 @@ module mpas_block_creator
 #endif
                            allocated_bytes = allocated_bytes + field_bytes
                            REPORT_TOTAL_ALLOCATION(allocated_bytes)
-                           int1DField % array(:) = int1DField % defaultValue
-                           !$acc update device(int1DField % array) if_present
+                           fillI1 => int1DField % array
+                           fillDefI = int1DField % defaultValue
+                           !$acc kernels copyout(fillI1(:))
+                           fillI1(:) = fillDefI
+                           !$acc end kernels
+                           !$acc update self(fillI1) if_present
                         end if
                      end if
                   end do
@@ -1876,8 +1917,12 @@ module mpas_block_creator
 #endif
                            allocated_bytes = allocated_bytes + field_bytes
                            REPORT_TOTAL_ALLOCATION(allocated_bytes)
-                           int2DField % array(:,:) = int2DField % defaultValue
-                           !$acc update device(int2DField % array) if_present
+                           fillI2 => int2DField % array
+                           fillDefI = int2DField % defaultValue
+                           !$acc kernels copyout(fillI2(:,:))
+                           fillI2(:,:) = fillDefI
+                           !$acc end kernels
+                           !$acc update self(fillI2) if_present
                         end if
                      end if
                   end do
@@ -1913,8 +1958,12 @@ module mpas_block_creator
 #endif
                            allocated_bytes = allocated_bytes + field_bytes
                            REPORT_TOTAL_ALLOCATION(allocated_bytes)
-                           int3DField % array(:,:,:) = int3DField % defaultValue
-                           !$acc update device(int3DField % array) if_present
+                           fillI3 => int3DField % array
+                           fillDefI = int3DField % defaultValue
+                           !$acc kernels copyout(fillI3(:,:,:))
+                           fillI3(:,:,:) = fillDefI
+                           !$acc end kernels
+                           !$acc update self(fillI3) if_present
                         end if
                      end if
                   end do
