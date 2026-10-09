@@ -1590,12 +1590,14 @@ module mpas_block_creator
       type (field3DInteger), pointer :: int3DField
       type (field1DChar), pointer :: char1DField
 
-      ! Local aliases for the default-value fill. The fill runs on the device,
-      ! and referencing fieldN % array / % defaultValue inside the compute
-      ! construct would both require the field type itself to be mapped and
-      ! attached, and defeat parallelisation: nvfortran cannot prove the pointer
-      ! member does not alias the scalar member, so it reports a loop-carried
-      ! dependence and schedules the outer loop seq.
+#ifdef MPAS_OPENACC
+      ! Local aliases for the default-value fill, which runs on the device.
+      ! Referencing fieldN % array / % defaultValue inside the compute construct
+      ! would require the field type itself to be mapped and attached -- only the
+      ! array is made resident, not the field -- and would defeat parallelisation:
+      ! nvfortran cannot prove the pointer member does not alias the scalar
+      ! member, so it reports a loop-carried dependence and schedules the outer
+      ! loop seq.
       real (kind=RKIND), dimension(:), pointer :: fillR1
       real (kind=RKIND), dimension(:,:), pointer :: fillR2
       real (kind=RKIND), dimension(:,:,:), pointer :: fillR3
@@ -1604,8 +1606,11 @@ module mpas_block_creator
       integer, dimension(:), pointer :: fillI1
       integer, dimension(:,:), pointer :: fillI2
       integer, dimension(:,:,:), pointer :: fillI3
+      character (len=StrKIND), dimension(:), pointer :: fillC1
       real (kind=RKIND) :: fillDefR
       integer :: fillDefI
+      character (len=StrKIND) :: fillDefC
+#endif
 
 
       integer :: timeLev, iDim
@@ -1672,12 +1677,20 @@ module mpas_block_creator
 #endif
                            allocated_bytes = allocated_bytes + field_bytes
                            REPORT_TOTAL_ALLOCATION(allocated_bytes)
+#ifdef MPAS_OPENACC
                            fillR1 => real1DField % array
                            fillDefR = real1DField % defaultValue
                            !$acc kernels copyout(fillR1(:))
                            fillR1(:) = fillDefR
                            !$acc end kernels
-                           !$acc update self(fillR1) if_present
+                           ! Stream I/O never writes the trailing garbage element, so on the host it would
+                           ! stay uninitialised -- and the update device after a read would push that up.
+                           if (mpas_dimension_num_garbage_elements(real1DField % dimNames(1), iErr = localErr) > 0) then
+                              fillR1(real1DField % dimSizes(1)) = fillDefR
+                           end if
+#else
+                           real1DField % array(:) = real1DField % defaultValue
+#endif
                         end if
                      end if
                   end do
@@ -1711,12 +1724,20 @@ module mpas_block_creator
 #endif
                            allocated_bytes = allocated_bytes + field_bytes
                            REPORT_TOTAL_ALLOCATION(allocated_bytes)
+#ifdef MPAS_OPENACC
                            fillR2 => real2DField % array
                            fillDefR = real2DField % defaultValue
                            !$acc kernels copyout(fillR2(:,:))
                            fillR2(:,:) = fillDefR
                            !$acc end kernels
-                           !$acc update self(fillR2) if_present
+                           ! Stream I/O never writes the trailing garbage element, so on the host it would
+                           ! stay uninitialised -- and the update device after a read would push that up.
+                           if (mpas_dimension_num_garbage_elements(real2DField % dimNames(2), iErr = localErr) > 0) then
+                              fillR2(:,real2DField % dimSizes(2)) = fillDefR
+                           end if
+#else
+                           real2DField % array(:,:) = real2DField % defaultValue
+#endif
                         end if
                      end if
                   end do
@@ -1752,12 +1773,20 @@ module mpas_block_creator
 #endif
                            allocated_bytes = allocated_bytes + field_bytes
                            REPORT_TOTAL_ALLOCATION(allocated_bytes)
+#ifdef MPAS_OPENACC
                            fillR3 => real3DField % array
                            fillDefR = real3DField % defaultValue
                            !$acc kernels copyout(fillR3(:,:,:))
                            fillR3(:,:,:) = fillDefR
                            !$acc end kernels
-                           !$acc update self(fillR3) if_present
+                           ! Stream I/O never writes the trailing garbage element, so on the host it would
+                           ! stay uninitialised -- and the update device after a read would push that up.
+                           if (mpas_dimension_num_garbage_elements(real3DField % dimNames(3), iErr = localErr) > 0) then
+                              fillR3(:,:,real3DField % dimSizes(3)) = fillDefR
+                           end if
+#else
+                           real3DField % array(:,:,:) = real3DField % defaultValue
+#endif
                         end if
                      end if
                   end do
@@ -1795,12 +1824,20 @@ module mpas_block_creator
 #endif
                            allocated_bytes = allocated_bytes + field_bytes
                            REPORT_TOTAL_ALLOCATION(allocated_bytes)
+#ifdef MPAS_OPENACC
                            fillR4 => real4DField % array
                            fillDefR = real4DField % defaultValue
                            !$acc kernels copyout(fillR4(:,:,:,:))
                            fillR4(:,:,:,:) = fillDefR
                            !$acc end kernels
-                           !$acc update self(fillR4) if_present
+                           ! Stream I/O never writes the trailing garbage element, so on the host it would
+                           ! stay uninitialised -- and the update device after a read would push that up.
+                           if (mpas_dimension_num_garbage_elements(real4DField % dimNames(4), iErr = localErr) > 0) then
+                              fillR4(:,:,:,real4DField % dimSizes(4)) = fillDefR
+                           end if
+#else
+                           real4DField % array(:,:,:,:) = real4DField % defaultValue
+#endif
                         end if
                      end if
                   end do
@@ -1839,12 +1876,20 @@ module mpas_block_creator
 #endif
                            allocated_bytes = allocated_bytes + field_bytes
                            REPORT_TOTAL_ALLOCATION(allocated_bytes)
+#ifdef MPAS_OPENACC
                            fillR5 => real5DField % array
                            fillDefR = real5DField % defaultValue
                            !$acc kernels copyout(fillR5(:,:,:,:,:))
                            fillR5(:,:,:,:,:) = fillDefR
                            !$acc end kernels
-                           !$acc update self(fillR5) if_present
+                           ! Stream I/O never writes the trailing garbage element, so on the host it would
+                           ! stay uninitialised -- and the update device after a read would push that up.
+                           if (mpas_dimension_num_garbage_elements(real5DField % dimNames(5), iErr = localErr) > 0) then
+                              fillR5(:,:,:,:,real5DField % dimSizes(5)) = fillDefR
+                           end if
+#else
+                           real5DField % array(:,:,:,:,:) = real5DField % defaultValue
+#endif
                         end if
                      end if
                   end do
@@ -1878,12 +1923,20 @@ module mpas_block_creator
 #endif
                            allocated_bytes = allocated_bytes + field_bytes
                            REPORT_TOTAL_ALLOCATION(allocated_bytes)
+#ifdef MPAS_OPENACC
                            fillI1 => int1DField % array
                            fillDefI = int1DField % defaultValue
                            !$acc kernels copyout(fillI1(:))
                            fillI1(:) = fillDefI
                            !$acc end kernels
-                           !$acc update self(fillI1) if_present
+                           ! Stream I/O never writes the trailing garbage element, so on the host it would
+                           ! stay uninitialised -- and the update device after a read would push that up.
+                           if (mpas_dimension_num_garbage_elements(int1DField % dimNames(1), iErr = localErr) > 0) then
+                              fillI1(int1DField % dimSizes(1)) = fillDefI
+                           end if
+#else
+                           int1DField % array(:) = int1DField % defaultValue
+#endif
                         end if
                      end if
                   end do
@@ -1917,12 +1970,20 @@ module mpas_block_creator
 #endif
                            allocated_bytes = allocated_bytes + field_bytes
                            REPORT_TOTAL_ALLOCATION(allocated_bytes)
+#ifdef MPAS_OPENACC
                            fillI2 => int2DField % array
                            fillDefI = int2DField % defaultValue
                            !$acc kernels copyout(fillI2(:,:))
                            fillI2(:,:) = fillDefI
                            !$acc end kernels
-                           !$acc update self(fillI2) if_present
+                           ! Stream I/O never writes the trailing garbage element, so on the host it would
+                           ! stay uninitialised -- and the update device after a read would push that up.
+                           if (mpas_dimension_num_garbage_elements(int2DField % dimNames(2), iErr = localErr) > 0) then
+                              fillI2(:,int2DField % dimSizes(2)) = fillDefI
+                           end if
+#else
+                           int2DField % array(:,:) = int2DField % defaultValue
+#endif
                         end if
                      end if
                   end do
@@ -1958,12 +2019,20 @@ module mpas_block_creator
 #endif
                            allocated_bytes = allocated_bytes + field_bytes
                            REPORT_TOTAL_ALLOCATION(allocated_bytes)
+#ifdef MPAS_OPENACC
                            fillI3 => int3DField % array
                            fillDefI = int3DField % defaultValue
                            !$acc kernels copyout(fillI3(:,:,:))
                            fillI3(:,:,:) = fillDefI
                            !$acc end kernels
-                           !$acc update self(fillI3) if_present
+                           ! Stream I/O never writes the trailing garbage element, so on the host it would
+                           ! stay uninitialised -- and the update device after a read would push that up.
+                           if (mpas_dimension_num_garbage_elements(int3DField % dimNames(3), iErr = localErr) > 0) then
+                              fillI3(:,:,int3DField % dimSizes(3)) = fillDefI
+                           end if
+#else
+                           int3DField % array(:,:,:) = int3DField % defaultValue
+#endif
                         end if
                      end if
                   end do
@@ -1994,7 +2063,20 @@ module mpas_block_creator
                            end if
                            allocated_bytes = allocated_bytes + field_bytes
                            REPORT_TOTAL_ALLOCATION(allocated_bytes)
+#ifdef MPAS_OPENACC
+                           fillC1 => char1DField % array
+                           fillDefC = char1DField % defaultValue
+                           !$acc kernels copyout(fillC1(:))
+                           fillC1(:) = fillDefC
+                           !$acc end kernels
+                           ! Stream I/O never writes the trailing garbage element, so on the host it would
+                           ! stay uninitialised -- and the update device after a read would push that up.
+                           if (mpas_dimension_num_garbage_elements(char1DField % dimNames(1), iErr = localErr) > 0) then
+                              fillC1(char1DField % dimSizes(1)) = fillDefC
+                           end if
+#else
                            char1DField % array(:) = char1DField % defaultValue
+#endif
                         end if
                      end if
                   end do
