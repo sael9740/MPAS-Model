@@ -129,6 +129,7 @@
  real(kind=RKIND),dimension(:,:),pointer:: rublten_Edge,rucuten_Edge
 
  real(kind=RKIND),dimension(:,:),allocatable:: tend_th
+ !$acc declare create(tend_th)
 
 !=================================================================================================================
 
@@ -191,7 +192,6 @@
 !initialize the tendency for the potential temperature and all scalars due to PBL, convection,
 !and longwave and shortwave radiation:
  allocate(tend_th(nVertLevels,nCellsSolve))
- !$acc enter data create(tend_th)
 
  !$acc kernels ACC_DEFAULT_ARG
  tend_th(:,:)             = 0._RKIND
@@ -260,7 +260,6 @@
  if(size(rnifablten) == 0) deallocate(rnifablten)
  if(size(rnwfablten) == 0) deallocate(rnwfablten)
 
- !$acc exit data delete(tend_th)
  deallocate(tend_th)
 
  end subroutine physics_get_tend
