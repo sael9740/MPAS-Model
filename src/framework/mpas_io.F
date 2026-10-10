@@ -15,6 +15,7 @@ module mpas_io
    use mpas_attlist
    use mpas_dmpar
    use mpas_log
+   use mpas_timer, only : mpas_timer_start, mpas_timer_stop
 
 #ifdef MPAS_PIO_SUPPORT
    use pio
@@ -1524,6 +1525,7 @@ module mpas_io
       decomp_cursor => handle % ioContext % decomp_list
 !if (.not. associated(decomp_cursor)) call mpas_log_write('No existing decompositions to check...')
       early_return = 0
+      call mpas_timer_start('decomp_search')
       DECOMP_LOOP: do while (associated(decomp_cursor))
 #ifdef MPAS_PIO_SUPPORT
          if (decomp_cursor % decomphandle % field_type == field_cursor % fieldhandle % field_type) then
@@ -1618,6 +1620,7 @@ module mpas_io
 #endif
          decomp_cursor => decomp_cursor % next
       end do DECOMP_LOOP
+      call mpas_timer_stop('decomp_search')
 
       ! 
       ! If all tasks have set early_return to 1, then we have a usable decomposition and can return
@@ -1660,6 +1663,7 @@ module mpas_io
  !!!!!!! PIO DOES NOT SUPPORT LOGICAL !!!!!!!!
       end if
 
+      call mpas_timer_start('compdof_build')
       allocate(dimlist(ndims))
 
       pd = 1
@@ -1730,7 +1734,10 @@ module mpas_io
       end if
 
       dimlist(ndims) = field_cursor % fieldhandle % dims(ndims) % dimsize
+      call mpas_timer_stop('compdof_build')
+      call mpas_timer_start('PIO_initdecomp')
       call PIO_initdecomp(handle % ioContext % pio_iosystem, pio_type, dimlist, compdof, new_decomp % decomphandle % pio_iodesc)
+      call mpas_timer_stop('PIO_initdecomp')
       deallocate(compdof)
       deallocate(dimlist)
 #endif
