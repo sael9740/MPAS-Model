@@ -68,30 +68,31 @@
                end do
             end if
             if ( dst_cursor % isActive .and. src_cursor % isActive ) then
-               ! Copy on the device, so this is correct wherever the valid data lives. The
-               ! cursor types are staged and the array members explicitly copied in because
-               ! referencing a pointer member inside a compute construct requires the
-               ! containing type to be present and the member attached; relying on the
-               ! compiler's implicit data region instead is correct only while the arrays are
-               ! NOT resident, and silently reads host addresses once they are.
-               ! The destination is created rather than copied in: the assignment overwrites
-               ! it whole, so its prior contents need not be transferred. The source is copied
-               ! in because it is read.
+               ! Copy on the device, so this is correct wherever the valid data lives.
+               ! The cursor types are staged and their array members copied in explicitly: a
+               ! pointer member used inside a compute construct needs its containing type
+               ! present and the member attached, and the compiler's implicit data region
+               ! silently reads host addresses once the arrays are resident. dst is created
+               ! rather than copied in because the assignment overwrites it whole.
                !$acc enter data create(src_cursor, dst_cursor)
                !$acc enter data copyin(src_cursor % array)
                !$acc enter data create(dst_cursor % array)
+               ! TODO revisit: nvfortran also emits a one-thread kernel here ("Accelerator
+               ! serial kernel generated") to evaluate dst_cursor % array$sd after the loop,
+               ! so every call costs a spare launch. The copy itself parallelises and
+               ! collapses correctly, so this is sloppy rather than wrong, and there is
+               ! probably a cleaner way to express the copy that avoids it. Naming the array
+               ! section explicitly is not that way -- measured identical, and the shared .inc
+               ! cannot express a per-rank section anyway.
                !$acc kernels
                dst_cursor % array = src_cursor % array
                !$acc end kernels
-               ! copyout/delete mirror the clauses above and restore the prior residency state
-               ! exactly, because both decrement the reference count rather than acting
-               ! unconditionally. If the arrays were not resident, the result is written back to
-               ! the host and the device copies are released. If they were already resident, the
-               ! count merely returns to what it was: no transfer, nothing freed, and the result
-               ! stays on the device where the valid copy lives. Leaving a reference behind here
-               ! would be silently destructive -- a later enter data copyin of the same field
-               ! would find it present and become a no-op, so host values computed after this
-               ! point would never reach the device.
+               ! These mirror the clauses above and restore the prior residency state exactly,
+               ! because copyout and delete both decrement the reference count rather than
+               ! acting unconditionally: not resident before, the result goes back to the host
+               ! and the device copies are freed; already resident, the count simply returns to
+               ! what it was. Leaving a reference behind would be silently destructive -- a
+               ! later enter data copyin would find the field present and become a no-op.
                !$acc exit data copyout(dst_cursor % array)
                !$acc exit data delete(src_cursor % array)
                !$acc exit data delete(src_cursor, dst_cursor)
