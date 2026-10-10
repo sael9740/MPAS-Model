@@ -716,7 +716,7 @@ module mpas_atm_boundaries
 
 
         !$acc kernels
-        nearestRelaxationCell(:) = nCells+1
+        nearestRelaxationCell(:) = nCells_acc+1
         !$acc end kernels
 
         !
