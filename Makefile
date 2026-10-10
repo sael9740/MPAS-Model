@@ -7,12 +7,19 @@ endif
 # GPU_MEM_MODE=<separate|managed|unified>[:suboption[:suboption...]] appends a
 # "mem:..." suboption to the nvhpc build target's -gpu= flag, selecting the
 # OpenACC memory model (and any nvhpc mem suboptions, e.g. unified:managedalloc).
-# If unset, no mem:... suboption is passed, which defaults to separate memory.
-ifneq "$(GPU_MEM_MODE)" ""
-        ACC_MEM_MODE = ,mem:$(GPU_MEM_MODE)
+# If unset it follows ACC_DEVICE_RESIDENT, since the two models want opposite
+# defaults: the GPU-resident model owns its device copies explicitly and wants
+# them in separate memory, while the hybrid model leans on the compiler's
+# implicit data regions and is simplest when host and device share an address
+# space. An explicit GPU_MEM_MODE= on the make command line overrides this.
+ifeq "$(GPU_MEM_MODE)" ""
+ifneq "$(ACC_DEVICE_RESIDENT)" "false"
+        GPU_MEM_MODE = separate
 else
-        ACC_MEM_MODE =
+        GPU_MEM_MODE = unified
 endif
+endif
+ACC_MEM_MODE = ,mem:$(GPU_MEM_MODE)
 
 dummy:
 	( $(MAKE) error )
@@ -169,7 +176,7 @@ nvhpc:   # BUILDTARGET NVIDIA HPC SDK
 	"LDFLAGS_DEBUG = -O0 -g -Mbounds -Ktrap=divz,fp,inv,ovf -traceback" \
 	"FFLAGS_OMP = -mp" \
 	"CFLAGS_OMP = -mp" \
-	"FFLAGS_ACC = -Mnofma -acc=host,gpu -gpu=cc90$(ACC_MEM_MODE) -Minfo=accel" \
+	"FFLAGS_ACC = -Mnofma -acc=host,gpu -gpu=ccnative$(ACC_MEM_MODE) -Minfo=accel" \
 	"CFLAGS_ACC =" \
 	"FFLAGS_NVHPC_ACC_BFB = -Mnofma -gpu=math_uniform" \
 	"FFLAGS_NVHPC_BFB = -Mnofma" \
@@ -1732,7 +1739,7 @@ errmsg:
 	@echo "    OPENACC=true  - builds and links with OpenACC flags. Default is to not use OpenACC."
 	@echo "    ACC_DEVICE_RESIDENT=false - builds the hybrid/development OpenACC data model, where data regions around each ported section perform real host/device transfers so that unported host code still sees correct values (requires OPENACC=true). Default is the GPU-resident data model, where device-used fields stay resident for the lifetime of their host-side allocation."
 	@echo "    MPAS_NVTX=true - instruments all MPAS timers with NVTX profiling regions (requires nvhpc). Default is to not use NVTX."
-	@echo "    GPU_MEM_MODE=<separate|managed|unified>[:suboption[:suboption...]] - selects the OpenACC GPU memory model via -gpu=mem:<...> (requires nvhpc), e.g. GPU_MEM_MODE=unified:managedalloc maps to -gpu=mem:unified:managedalloc. Default is unset, which leaves -gpu=mem:... off (nvhpc default of separate host/device memory)."
+	@echo "    GPU_MEM_MODE=<separate|managed|unified>[:suboption[:suboption...]] - selects the OpenACC GPU memory model via -gpu=mem:<...> (requires nvhpc), e.g. GPU_MEM_MODE=unified:managedalloc maps to -gpu=mem:unified:managedalloc. Default follows ACC_DEVICE_RESIDENT: separate for the GPU-resident model, unified for the hybrid model."
 	@echo "    NVHPC_BFB=true - adds -Mnofma (CPU/GPU) and -gpu=math_uniform (GPU) so nvhpc GPU builds are bit-for-bit reproducible against nvhpc CPU builds (requires nvhpc). Default is off."
 	@echo "    PRECISION=double - builds with default double-precision real kind. Default is to use single-precision."
 	@echo "    SHAREDLIB=true - generate position-independent code suitable for use in a shared library. Default is false."
