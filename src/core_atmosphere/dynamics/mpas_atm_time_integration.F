@@ -1321,7 +1321,7 @@ module atm_time_integration
 
          !NOTE: The calculation of the tendency due to horizontal and vertical advection for the water vapor mixing ratio
          !requires that the subroutine atm_advance_scalars_mono was called on the third Runge Kutta step, so that a halo
-         !update for the scalars at time_levs(1) is applied. A halo update for the scalars at time_levs(2) is done above.
+         !update for the scalars at time_levs(1) is applied. A halo update for the scalars at time_levs(2) is done above. 
          if (config_monotonic) then
             rqvdynten(:,:) = ( scalars_2(index_qv,:,:) - scalars_1(index_qv,:,:) ) / dt
          else
@@ -5817,16 +5817,6 @@ module atm_time_integration
 
          ke_fact = 1.0 - .375
 
-         ! These two loops must be separate compute constructs. OpenACC places no
-         ! barrier between `loop` constructs inside one `parallel` region, so with
-         ! both in a single region a gang running the second loop can read ke(k,iCell)
-         ! before another gang has applied the ke_fact scaling in the first. The two
-         ! loops also carry different schedules -- collapse(2) over (iCell,k) versus
-         ! gang over iCell -- so the iteration-to-gang mapping genuinely differs and
-         ! the dependence is not resolved by program order within a gang.
-         !
-         ! Under OpenMP this is safe because each thread owns cellStart..cellEnd for
-         ! both loops, making the dependence thread-local; only the OpenACC path races.
          !$acc parallel ACC_DEFAULT_ARG
          !$acc loop collapse(2)
          do iCell=cellStart,cellEnd

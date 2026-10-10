@@ -5,7 +5,6 @@
 ! Additional copyright and license information can be found in the LICENSE file
 ! distributed with this code, or at http://mpas-dev.github.com/license.html
 !
-
 module atm_core
 
    use mpas_derived_types
@@ -559,13 +558,11 @@ module atm_core
       call mpas_init_reconstruct(mesh)
       call mpas_timer_stop('mpas_init_reconstruct')
 
-      ! coeffs_reconstruct is computed on the host: mpas_init_reconstruct
-      ! allocates and deallocates work arrays once per cell and calls into
-      ! mpas_rbf_interpolation, whose RBF fit bottoms out in a dense Gaussian
-      ! elimination using automatic arrays sized by a runtime argument. Porting
-      ! it would mean restructuring operator code shared by every MPAS core, so
-      ! republish the result here instead, keeping the sync in the atmosphere
-      ! core rather than in the shared operator.
+      ! An exception to the data model: coeffs_reconstruct is produced on the host by
+      ! mpas_init_reconstruct, which is shared operator code every MPAS core uses. The
+      ! operator does enter data copyin on it, but the array is already resident by
+      ! then, so that clause only bumps the reference count and copies nothing. Push it
+      ! explicitly here.
       call mpas_pool_get_array(mesh, 'coeffs_reconstruct', coeffs_reconstruct)
       !$acc update device(coeffs_reconstruct) if_present
 
@@ -656,7 +653,7 @@ module atm_core
       use mpas_timer, only : mpas_timer_start, mpas_timer_stop
       use mpas_atm_boundaries, only : mpas_atm_update_bdy_tend
       use mpas_atm_diagnostics_manager, only : mpas_atm_diag_update, mpas_atm_diag_compute, mpas_atm_diag_reset
-
+   
       implicit none
    
       type (domain_type), intent(inout) :: domain
@@ -1429,11 +1426,10 @@ module atm_core
 ! initialization for heights of coordinate at u and w levels  
 ! These are the heights of the computational coordinate zeta
       
-      ! The epssm profiles below stay on the host: they are vertical-only
-      ! (nVertLevels), the height_w_levels loop is a sequential recurrence, and both
-      ! coefficient loops carry MPAS_DEBUG logging. Sync either side so this remains
-      ! correct once these fields are device-resident, where the device copy is the
-      ! valid one.
+      ! An exception to the data model: the epssm profiles below stay on the host,
+      ! being vertical-only, serial in k, and interleaved with MPAS_DEBUG logging.
+      ! rdzw is fetched because the host reads it; etp/etm/ewp/ewm are republished
+      ! after the loops because the host writes them and the device is their consumer.
       !$acc update self(rdzw) if_present
 
       height_w_levels(:) = 0.0_RKIND

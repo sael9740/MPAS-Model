@@ -464,6 +464,7 @@
     enddo
  endif
 
+
 !convert the tendency for the potential temperature to tendency for the modified potential temperature:
 !This runs unconditionally (not gated by any physics scheme), against scalars/tend_theta/tend_th,
 !all of which are device-resident, so it runs on the device rather than via a host round-trip.
@@ -475,6 +476,7 @@
     tend_theta(k,i) = tend_theta(k,i) + tend_th(k,i)
  enddo
  enddo
+
 
  end subroutine physics_get_tend_work
 
