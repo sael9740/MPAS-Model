@@ -637,6 +637,10 @@ module atm_core
       call mpas_pool_get_array(mesh, 'meshScalingDel2', meshScalingDel2)
       call mpas_pool_get_array(mesh, 'meshScalingDel4', meshScalingDel4)
 
+      ! Both are computed on the device in atm_compute_mesh_scaling; fetch them
+      ! for the host reductions below, which otherwise see the fill value.
+      !$acc update self(meshScalingDel2, meshScalingDel4) if_present
+
       call mpas_log_write('min/max of meshScalingDel2 = $r $r', &
                           realArgs=(/minval(meshScalingDel2(1:nEdgesSolve)), maxval(meshScalingDel2(1:nEdgesSolve))/))
       call mpas_log_write('min/max of meshScalingDel4 = $r $r', &
