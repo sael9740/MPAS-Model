@@ -1316,13 +1316,6 @@ module atm_time_integration
       call mpas_pool_get_array(tend_physics, 'rthdynten', rthdynten)
       call mpas_pool_get_array(tend_physics, 'rqvdynten', rqvdynten)
 
-      ! Data region for the physics-boundary fields, closed just before the microphysics call.
-      ! Without persistent residency it pushes this section's host writes (the cu-scheme
-      ! dynamical tendency, when active) to the device and pulls results back; with residency
-      ! these fields are already present, so entering and exiting is only a reference-count
-      ! bump and decrement, with no transfer.
-      !$acc data copy(scalars_1, scalars_2, theta_m, rthdynten, rqvdynten)
-
       if(config_convection_scheme == 'cu_grell_freitas' .or. &
          config_convection_scheme == 'cu_ntiedtke') then
 
@@ -1350,8 +1343,6 @@ module atm_time_integration
       where ( scalars_2(:,:,:) < 0.0)  &
          scalars_2(:,:,:) = 0.0
       !$acc end kernels
-
-      !$acc end data
 
       !call microphysics schemes:
       if (trim(config_microp_scheme) /= 'off')  then
