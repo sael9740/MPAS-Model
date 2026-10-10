@@ -3424,10 +3424,10 @@ module mpas_stream_manager
            ! prewrite_reindex below rewrites connectivity on the host, and the write
            ! itself reads host memory.
            !
-           call mpas_timer_start('update_all_fields')
+           call mpas_timer_start('d2h_for_write')
            call update_all_fields(manager % allFields, manager % allPackages, stream % field_pool, &
                                   stream % field_pkg_pool, stream % timeLevel, .false., local_ierr)
-           call mpas_timer_stop('update_all_fields')
+           call mpas_timer_stop('d2h_for_write')
 
            !
            ! For any connectivity arrays in the stream, temporarily convert local indices to global indices
@@ -4048,6 +4048,21 @@ module mpas_stream_manager
                stream % timeLevel = timeLevel
            end if
 
+           !
+           ! Pull the device copy to the host before reading, so that the host-to-device
+           ! update below cannot send data the read did not write. A read fills only what
+           ! the file holds: a var-array whose constituents are partly absent is filled in
+           ! part (isAvailable in mpas_io_streams.F), and a field missing from the file
+           ! altogether is never registered and so is never read. Seeding the host from the
+           ! device first makes the round trip a no-op for anything the read skips, rather
+           ! than sending an unwritten host array over a valid device copy. It also gives
+           ! exch_all_halos and postread_reindex, which both run over every registered
+           ! field, real values to work on.
+           !
+           call mpas_timer_start('d2h_for_read')
+           call update_all_fields(manager % allFields, manager % allPackages, stream % field_pool, &
+                                  stream % field_pkg_pool, stream % timeLevel, .false., local_ierr)
+           call mpas_timer_stop('d2h_for_read')
            ! 
            ! Read the stream
            ! 
@@ -4086,14 +4101,14 @@ module mpas_stream_manager
            call mpas_timer_stop('reindex')
 
            !
-           ! Publish the freshly-read fields to the device. This runs last, after
+           ! Send the freshly-read fields to the device. This runs last, after
            ! exch_all_halos and postread_reindex, because both of those are host-side
            ! algorithms whose results must also reach the device.
            !
-           call mpas_timer_start('update_all_fields')
+           call mpas_timer_start('h2d_for_read')
            call update_all_fields(manager % allFields, manager % allPackages, stream % field_pool, &
                                   stream % field_pkg_pool, stream % timeLevel, .true., local_ierr)
-           call mpas_timer_stop('update_all_fields')
+           call mpas_timer_stop('h2d_for_read')
         end if
 
     end subroutine read_stream !}}}
@@ -4936,7 +4951,7 @@ module mpas_stream_manager
     !>  which are host-side algorithms), and before a write the device holds
     !>  whatever the model just computed.
     !>
-    !>  toDevice = .true.  publishes the host copy to the device, and is called
+    !>  toDevice = .true.  sends the host copy to the device, and is called
     !>                     at the end of read_stream, after the host-side halo
     !>                     exchange and index reindexing have run.
     !>  toDevice = .false. fetches the device copy to the host, and is called at
