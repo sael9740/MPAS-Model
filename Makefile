@@ -11,9 +11,11 @@ endif
 # defaults: the GPU-resident model owns its device copies explicitly and wants
 # them in separate memory, while the hybrid model leans on the compiler's
 # implicit data regions and is simplest when host and device share an address
-# space. An explicit GPU_MEM_MODE= on the make command line overrides this.
+# space. ACC_DEVICE_RESIDENT itself defaults to the hybrid model, so an
+# unqualified build gets mem:unified. An explicit GPU_MEM_MODE= on the make
+# command line overrides this.
 ifeq "$(GPU_MEM_MODE)" ""
-ifneq "$(ACC_DEVICE_RESIDENT)" "false"
+ifeq "$(ACC_DEVICE_RESIDENT)" "true"
         GPU_MEM_MODE = separate
 else
         GPU_MEM_MODE = unified
@@ -910,7 +912,10 @@ ifeq "$(OPENACC)" "true"
 # by this macro is what makes a field device-resident in the first place, so a
 # build without it falls back to the hybrid/development model, where data
 # regions around each ported section perform real transfers and unported host
-# code still sees correct values. Only meaningful with OPENACC=true.
+# code still sees correct values. That hybrid model is the default: only an
+# explicit ACC_DEVICE_RESIDENT=true selects residency, because the port is not
+# complete and the hybrid model is the one that is correct for unported code.
+# Only meaningful with OPENACC=true.
 #
 # ACC_DEFAULT_ARG is the default data clause placed on every !$acc parallel
 # construct. In the GPU-resident model it expands to default(present), so a field
@@ -918,7 +923,7 @@ ifeq "$(OPENACC)" "true"
 # than a silent copy of stale host data. In the hybrid/development model it
 # expands to nothing, letting the compiler generate an implicit data region per
 # construct so that unported host code still sees correct values.
-ifneq "$(ACC_DEVICE_RESIDENT)" "false"
+ifeq "$(ACC_DEVICE_RESIDENT)" "true"
         override CPPFLAGS += "-DACC_DEVICE_RESIDENT"
         override CPPFLAGS += '-DACC_DEFAULT_ARG=default(present)'
 else
@@ -1082,7 +1087,7 @@ else
 endif
 
 ifeq "$(OPENACC)" "true"
-ifneq "$(ACC_DEVICE_RESIDENT)" "false"
+ifeq "$(ACC_DEVICE_RESIDENT)" "true"
 	ACC_DEVICE_RESIDENT_MESSAGE="MPAS was built with the GPU-resident OpenACC data model."
 else
 	ACC_DEVICE_RESIDENT_MESSAGE="MPAS was built with the hybrid/development OpenACC data model."
@@ -1737,7 +1742,7 @@ errmsg:
 	@echo "                    TIMER_LIB=tau - Uses TAU for the timer interface instead of the native interface"
 	@echo "    OPENMP=true   - builds and links with OpenMP flags. Default is to not use OpenMP."
 	@echo "    OPENACC=true  - builds and links with OpenACC flags. Default is to not use OpenACC."
-	@echo "    ACC_DEVICE_RESIDENT=false - builds the hybrid/development OpenACC data model, where data regions around each ported section perform real host/device transfers so that unported host code still sees correct values (requires OPENACC=true). Default is the GPU-resident data model, where device-used fields stay resident for the lifetime of their host-side allocation."
+	@echo "    ACC_DEVICE_RESIDENT=true - builds the GPU-resident OpenACC data model, where device-used fields stay resident for the lifetime of their host-side allocation (requires OPENACC=true). Default is the hybrid/development data model, where data regions around each ported section perform real host/device transfers so that unported host code still sees correct values."
 	@echo "    MPAS_NVTX=true - instruments all MPAS timers with NVTX profiling regions (requires nvhpc). Default is to not use NVTX."
 	@echo "    GPU_MEM_MODE=<separate|managed|unified>[:suboption[:suboption...]] - selects the OpenACC GPU memory model via -gpu=mem:<...> (requires nvhpc), e.g. GPU_MEM_MODE=unified:managedalloc maps to -gpu=mem:unified:managedalloc. Default follows ACC_DEVICE_RESIDENT: separate for the GPU-resident model, unified for the hybrid model."
 	@echo "    NVHPC_BFB=true - adds -Mnofma (CPU/GPU) and -gpu=math_uniform (GPU) so nvhpc GPU builds are bit-for-bit reproducible against nvhpc CPU builds (requires nvhpc). Default is off."
