@@ -446,7 +446,6 @@ module atm_time_integration
       logical, pointer :: config_scalar_advection
       logical, pointer :: config_positive_definite
       logical, pointer :: config_monotonic
-      logical, pointer :: config_gpu_aware_mpi
       character (len=StrKIND), pointer :: config_microp_scheme
       character (len=StrKIND), pointer :: config_convection_scheme
 
@@ -491,7 +490,6 @@ module atm_time_integration
       call mpas_pool_get_config(block % configs, 'config_scalar_advection', config_scalar_advection)
       call mpas_pool_get_config(block % configs, 'config_positive_definite', config_positive_definite)
       call mpas_pool_get_config(block % configs, 'config_monotonic', config_monotonic)
-      call mpas_pool_get_config(block % configs, 'config_gpu_aware_mpi', config_gpu_aware_mpi)
       call mpas_pool_get_config(block % configs, 'config_IAU_option', config_IAU_option)
       !  config variables for dynamics-transport splitting, WCS 18 November 2014
       call mpas_pool_get_config(block % configs, 'config_split_dynamics_transport', config_split_dynamics_transport)
@@ -647,9 +645,7 @@ module atm_time_integration
       call mpas_pool_get_array(state, 'scalars', scalars_1, 1)
       call mpas_pool_get_array(diag, 'pressure_p', pressure_p)
       call mpas_pool_get_array(diag, 'rtheta_p', rtheta_p)
-      !$acc update self(theta_m,scalars_1,pressure_p,rtheta_p) if (.not. config_gpu_aware_mpi)
-      call exchange_halo_group(domain, 'dynamics:theta_m,scalars,pressure_p,rtheta_p', config_gpu_aware_mpi)
-      !$acc update device(theta_m,scalars_1,pressure_p,rtheta_p) if (.not. config_gpu_aware_mpi)
+      call exchange_halo_group(domain, 'dynamics:theta_m,scalars,pressure_p,rtheta_p')
       MPAS_ACC_TIMER_STOP('atm_srk3: halo_exchanges + ACC_data_xfer')
 
       call mpas_timer_start('atm_rk_integration_setup')
@@ -747,9 +743,7 @@ module atm_time_integration
 
          MPAS_ACC_TIMER_START('atm_srk3: halo_exchanges + ACC_data_xfer')
          call mpas_pool_get_array(diag, 'exner', exner)
-         !$acc update self(exner) if (.not. config_gpu_aware_mpi)
-         call exchange_halo_group(domain, 'dynamics:exner', config_gpu_aware_mpi)
-         !$acc update device(exner) if (.not. config_gpu_aware_mpi)
+         call exchange_halo_group(domain, 'dynamics:exner')
          MPAS_ACC_TIMER_STOP('atm_srk3: halo_exchanges + ACC_data_xfer')
 
          !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
@@ -831,9 +825,7 @@ module atm_time_integration
 ! tend_u
             MPAS_ACC_TIMER_START('atm_srk3: halo_exchanges + ACC_data_xfer')
             call mpas_pool_get_array(tend, 'u', tend_u)
-            !$acc update self(tend_u) if (.not. config_gpu_aware_mpi)
-            call exchange_halo_group(domain, 'dynamics:tend_u', config_gpu_aware_mpi)
-            !$acc update device(tend_u) if (.not. config_gpu_aware_mpi)
+            call exchange_halo_group(domain, 'dynamics:tend_u')
             MPAS_ACC_TIMER_STOP('atm_srk3: halo_exchanges + ACC_data_xfer')
    
             call mpas_timer_start('small_step_prep')
@@ -912,9 +904,7 @@ module atm_time_integration
 
                MPAS_ACC_TIMER_START('atm_srk3: halo_exchanges + ACC_data_xfer')
                call mpas_pool_get_array(diag, 'rho_pp', rho_pp)
-               !$acc update self(rho_pp) if (.not. config_gpu_aware_mpi)
-               call exchange_halo_group(domain, 'dynamics:rho_pp', config_gpu_aware_mpi)
-               !$acc update device(rho_pp) if (.not. config_gpu_aware_mpi)
+               call exchange_halo_group(domain, 'dynamics:rho_pp')
                MPAS_ACC_TIMER_STOP('atm_srk3: halo_exchanges + ACC_data_xfer')
 
                call mpas_timer_start('atm_advance_acoustic_step')
@@ -939,9 +929,7 @@ module atm_time_integration
 ! This is the only communications needed during the acoustic steps because we solve for u on all edges of owned cells
                MPAS_ACC_TIMER_START('atm_srk3: halo_exchanges + ACC_data_xfer')
                call mpas_pool_get_array(diag, 'rtheta_pp', rtheta_pp)
-               !$acc update self(rtheta_pp) if (.not. config_gpu_aware_mpi)
-               call exchange_halo_group(domain, 'dynamics:rtheta_pp', config_gpu_aware_mpi)
-               !$acc update device(rtheta_pp) if (.not. config_gpu_aware_mpi)
+               call exchange_halo_group(domain, 'dynamics:rtheta_pp')
                MPAS_ACC_TIMER_STOP('atm_srk3: halo_exchanges + ACC_data_xfer')
 
 !  complete update of horizontal momentum by including 3d divergence damping at the end of the acoustic step
@@ -967,9 +955,7 @@ module atm_time_integration
             call mpas_pool_get_array(diag, 'rw_p', rw_p)
             call mpas_pool_get_array(diag, 'rho_pp', rho_pp)
             call mpas_pool_get_array(diag, 'rtheta_pp', rtheta_pp)
-            !$acc update self(rw_p,ru_p,rho_pp,rtheta_pp) if (.not. config_gpu_aware_mpi)
-            call exchange_halo_group(domain, 'dynamics:rw_p,ru_p,rho_pp,rtheta_pp', config_gpu_aware_mpi)
-            !$acc update device(rw_p,ru_p,rho_pp,rtheta_pp) if (.not. config_gpu_aware_mpi)
+            call exchange_halo_group(domain, 'dynamics:rw_p,ru_p,rho_pp,rtheta_pp')
             MPAS_ACC_TIMER_STOP('atm_srk3: halo_exchanges + ACC_data_xfer')
 
             call mpas_timer_start('atm_recover_large_step_variables')
@@ -1040,14 +1026,12 @@ module atm_time_integration
             
             MPAS_ACC_TIMER_START('atm_srk3: halo_exchanges + ACC_data_xfer')
             call mpas_pool_get_array(state, 'u', u, 2)
-            !$acc update self(u) if (.not. config_gpu_aware_mpi)
             ! u
             if (config_apply_lbcs) then
-               call exchange_halo_group(domain, 'dynamics:u_123', config_gpu_aware_mpi)
+               call exchange_halo_group(domain, 'dynamics:u_123')
             else
-               call exchange_halo_group(domain, 'dynamics:u_3', config_gpu_aware_mpi)
+               call exchange_halo_group(domain, 'dynamics:u_3')
             end if
-            !$acc update device(u) if (.not. config_gpu_aware_mpi)
             MPAS_ACC_TIMER_STOP('atm_srk3: halo_exchanges + ACC_data_xfer')
 
             ! scalar advection: RK3 scheme of Skamarock and Gassmann (2011). 
@@ -1056,15 +1040,13 @@ module atm_time_integration
             if (config_scalar_advection .and. (.not. config_split_dynamics_transport) ) then
 
                call advance_scalars('scalars', domain, rk_step, rk_timestep, config_monotonic, config_positive_definite, &
-                                    config_time_integration_order, config_split_dynamics_transport, config_gpu_aware_mpi, exchange_halo_group)
+                                    config_time_integration_order, config_split_dynamics_transport, exchange_halo_group)
 
                if (config_apply_lbcs) then  ! adjust boundary tendencies for regional_MPAS scalar transport
 
                   MPAS_ACC_TIMER_START('atm_srk3: halo_exchanges + ACC_data_xfer')
                   call mpas_pool_get_array(state, 'scalars', scalars_2, 2)
-                  !$acc update self(scalars_2) if (.not. config_gpu_aware_mpi)
-                  call exchange_halo_group(domain, 'dynamics:scalars', config_gpu_aware_mpi)
-                  !$acc update device(scalars_2) if (.not. config_gpu_aware_mpi)
+                  call exchange_halo_group(domain, 'dynamics:scalars')
                   MPAS_ACC_TIMER_STOP('atm_srk3: halo_exchanges + ACC_data_xfer')
 
                   allocate(scalars_driving(num_scalars,nVertLevels,nCells+1))
@@ -1121,22 +1103,18 @@ module atm_time_integration
             call mpas_pool_get_array(state, 'w', w, 2)
             call mpas_pool_get_array(diag, 'pv_edge', pv_edge)
             call mpas_pool_get_array(diag, 'rho_edge', rho_edge)            
-            !$acc update self(w,pv_edge,rho_edge) if (.not. config_gpu_aware_mpi)
             if (config_scalar_advection .and. (.not. config_split_dynamics_transport) ) then
                !
                ! Communicate halos for w[1,2], pv_edge[1,2], rho_edge[1,2], scalars[1,2]
                !
                call mpas_pool_get_array(state, 'scalars', scalars_2, 2)
-               !$acc update self(scalars_2) if (.not. config_gpu_aware_mpi)
-               call exchange_halo_group(domain, 'dynamics:w,pv_edge,rho_edge,scalars', config_gpu_aware_mpi)
-               !$acc update device(scalars_2) if (.not. config_gpu_aware_mpi)
+               call exchange_halo_group(domain, 'dynamics:w,pv_edge,rho_edge,scalars')
             else
                !
                ! Communicate halos for w[1,2], pv_edge[1,2], rho_edge[1,2]
                !
-               call exchange_halo_group(domain, 'dynamics:w,pv_edge,rho_edge', config_gpu_aware_mpi)
+               call exchange_halo_group(domain, 'dynamics:w,pv_edge,rho_edge')
             end if
-            !$acc update device(w,pv_edge,rho_edge) if (.not. config_gpu_aware_mpi)
             MPAS_ACC_TIMER_STOP('atm_srk3: halo_exchanges + ACC_data_xfer')
 
             ! set the zero-gradient condition on w for regional_MPAS
@@ -1153,9 +1131,7 @@ module atm_time_integration
               MPAS_ACC_TIMER_START('atm_srk3: halo_exchanges + ACC_data_xfer')
               ! w halo values needs resetting after regional boundary update
               call mpas_pool_get_array(state, 'w', w, 2)
-              !$acc update self(w) if (.not. config_gpu_aware_mpi)
-              call exchange_halo_group(domain, 'dynamics:w', config_gpu_aware_mpi)
-              !$acc update device(w) if (.not. config_gpu_aware_mpi)
+              call exchange_halo_group(domain, 'dynamics:w')
               MPAS_ACC_TIMER_STOP('atm_srk3: halo_exchanges + ACC_data_xfer')
 
             end if ! end of regional_MPAS addition 
@@ -1171,9 +1147,7 @@ module atm_time_integration
             call mpas_pool_get_array(state, 'theta_m', theta_m, 2)
             call mpas_pool_get_array(diag, 'pressure_p', pressure_p)
             call mpas_pool_get_array(diag, 'rtheta_p', rtheta_p)
-            !$acc update self(theta_m,pressure_p,rtheta_p) if (.not. config_gpu_aware_mpi)
-            call exchange_halo_group(domain, 'dynamics:theta_m,pressure_p,rtheta_p', config_gpu_aware_mpi)
-            !$acc update device(theta_m,pressure_p,rtheta_p) if (.not. config_gpu_aware_mpi)
+            call exchange_halo_group(domain, 'dynamics:theta_m,pressure_p,rtheta_p')
             MPAS_ACC_TIMER_STOP('atm_srk3: halo_exchanges + ACC_data_xfer')
 
             !
@@ -1236,16 +1210,14 @@ module atm_time_integration
 
 
             call advance_scalars('scalars', domain, rk_step, rk_timestep, config_monotonic, config_positive_definite, &
-                                 config_time_integration_order, config_split_dynamics_transport, config_gpu_aware_mpi, exchange_halo_group)
+                                 config_time_integration_order, config_split_dynamics_transport, exchange_halo_group)
 
             if (config_apply_lbcs) then  ! adjust boundary tendencies for regional_MPAS scalar transport
 
                MPAS_ACC_TIMER_START('atm_srk3: halo_exchanges + ACC_data_xfer')
                ! need to fill halo for horizontal filter
                call mpas_pool_get_array(state, 'scalars', scalars_2, 2)
-               !$acc update self(scalars_2) if (.not. config_gpu_aware_mpi)
-               call exchange_halo_group(domain, 'dynamics:scalars', config_gpu_aware_mpi)
-               !$acc update device(scalars_2) if (.not. config_gpu_aware_mpi)
+               call exchange_halo_group(domain, 'dynamics:scalars')
                MPAS_ACC_TIMER_STOP('atm_srk3: halo_exchanges + ACC_data_xfer')
    
                allocate(scalars_driving(num_scalars,nVertLevels,nCells+1))
@@ -1274,9 +1246,7 @@ module atm_time_integration
             if (rk_step < 3) then
                MPAS_ACC_TIMER_START('atm_srk3: halo_exchanges + ACC_data_xfer')
                call mpas_pool_get_array(state, 'scalars', scalars_2, 2)
-               !$acc update self(scalars_2) if (.not. config_gpu_aware_mpi)
-               call exchange_halo_group(domain, 'dynamics:scalars', config_gpu_aware_mpi)
-               !$acc update device(scalars_2) if (.not. config_gpu_aware_mpi)
+               call exchange_halo_group(domain, 'dynamics:scalars')
                MPAS_ACC_TIMER_STOP('atm_srk3: halo_exchanges + ACC_data_xfer')
             end if
 
@@ -1395,9 +1365,7 @@ module atm_time_integration
 
          MPAS_ACC_TIMER_START('atm_srk3: halo_exchanges + ACC_data_xfer')
          call mpas_pool_get_array(state, 'scalars', scalars_2, 2)
-         !$acc update self(scalars_2) if (.not. config_gpu_aware_mpi)
-         call exchange_halo_group(domain, 'dynamics:scalars', config_gpu_aware_mpi)
-         !$acc update device(scalars_2) if (.not. config_gpu_aware_mpi)
+         call exchange_halo_group(domain, 'dynamics:scalars')
          MPAS_ACC_TIMER_STOP('atm_srk3: halo_exchanges + ACC_data_xfer')
 
          allocate(scalars_driving(num_scalars,nVertLevels,nCells+1))
@@ -1451,7 +1419,7 @@ module atm_time_integration
    !
    !-----------------------------------------------------------------------
    subroutine advance_scalars(field_name, domain, rk_step, rk_timestep, config_monotonic, config_positive_definite, &
-                              config_time_integration_order, config_split_dynamics_transport, config_gpu_aware_mpi, exchange_halo_group)
+                              config_time_integration_order, config_split_dynamics_transport, exchange_halo_group)
 
       implicit none
 
@@ -1464,7 +1432,6 @@ module atm_time_integration
       logical, intent(in) :: config_positive_definite
       integer, intent(in) :: config_time_integration_order
       logical, intent(in) :: config_split_dynamics_transport
-      logical, intent(in) :: config_gpu_aware_mpi
       procedure (halo_exchange_routine) :: exchange_halo_group
 
       ! Local variables
@@ -1598,7 +1565,7 @@ module atm_time_integration
                                           edgeThreadStart(thread), edgeThreadEnd(thread), &
                                           cellSolveThreadStart(thread), cellSolveThreadEnd(thread), &
                                           scalar_old_arr, scalar_new_arr, s_max_arr, s_min_arr, wdtn_arr, &
-                                          flux_array, flux_upwind_tmp_arr, flux_tmp_arr, config_gpu_aware_mpi, &
+                                          flux_array, flux_upwind_tmp_arr, flux_tmp_arr, &
                                           exchange_halo_group, &
                                           advance_density=config_split_dynamics_transport, rho_zz_int=rho_zz_int)
          end if
@@ -3498,7 +3465,7 @@ module atm_time_integration
                                        cellStart, cellEnd, edgeStart, edgeEnd, &
                                        cellSolveStart, cellSolveEnd, &
                                        scalar_old, scalar_new, s_max, s_min, wdtn, flux_arr, &
-                                       flux_upwind_tmp, flux_tmp, config_gpu_aware_mpi, exchange_halo_group, advance_density, rho_zz_int)
+                                       flux_upwind_tmp, flux_tmp, exchange_halo_group, advance_density, rho_zz_int)
 
       implicit none
 
@@ -3519,7 +3486,6 @@ module atm_time_integration
       real (kind=RKIND), dimension(:,:), intent(inout) :: wdtn
       real (kind=RKIND), dimension(:,:), intent(inout) :: flux_arr
       real (kind=RKIND), dimension(:,:), intent(inout) :: flux_upwind_tmp, flux_tmp
-      logical, intent(in) :: config_gpu_aware_mpi
       procedure (halo_exchange_routine) :: exchange_halo_group
       logical, intent(in), optional :: advance_density
       real (kind=RKIND), dimension(:,:), intent(inout), optional :: rho_zz_int
@@ -3598,7 +3564,7 @@ module atm_time_integration
                                    edgesOnCell, edgesOnCell_sign, nEdgesOnCell, fnm, fnp, rdnw, nAdvCellsForEdge, &
                                    advCellsForEdge, adv_coefs, adv_coefs_3rd, scalar_old, scalar_new, s_max, s_min, &
                                    wdtn, scale_arr, flux_arr, flux_upwind_tmp, flux_tmp, &
-                                   bdyMaskCell, bdyMaskEdge, config_gpu_aware_mpi, &
+                                   bdyMaskCell, bdyMaskEdge, &
                                    exchange_halo_group, advance_density, rho_zz_int)
 
       call mpas_deallocate_scratch_field(scale)
@@ -3646,7 +3612,7 @@ module atm_time_integration
                                    edgesOnCell, edgesOnCell_sign, nEdgesOnCell, fnm, fnp, rdnw, nAdvCellsForEdge, &
                                    advCellsForEdge, adv_coefs, adv_coefs_3rd, scalar_old, scalar_new, s_max, s_min, &
                                    wdtn, scale_arr, flux_arr, flux_upwind_tmp, flux_tmp, &
-                                   bdyMaskCell, bdyMaskEdge, config_gpu_aware_mpi, &
+                                   bdyMaskCell, bdyMaskEdge, &
                                    exchange_halo_group, advance_density, rho_zz_int)
 
       use mpas_atm_dimensions, only : nVertLevels
@@ -3662,7 +3628,6 @@ module atm_time_integration
       real (kind=RKIND), intent(in)        :: dt
       integer, intent(in) :: cellStart, cellEnd, edgeStart, edgeEnd
       integer, intent(in) :: cellSolveStart, cellSolveEnd
-      logical, intent(in) :: config_gpu_aware_mpi
       procedure (halo_exchange_routine) :: exchange_halo_group
       logical, intent(in), optional :: advance_density
       real (kind=RKIND), dimension(:,:), intent(inout), optional :: rho_zz_int
@@ -3758,19 +3723,13 @@ module atm_time_integration
 
       !$acc end parallel
 
-      MPAS_ACC_TIMER_START('atm_advance_scalars_mono [ACC_data_xfer]')
-      !$acc update self(scalars_old) if (.not. config_gpu_aware_mpi)
-      MPAS_ACC_TIMER_STOP('atm_advance_scalars_mono [ACC_data_xfer]')
 
 !$OMP BARRIER
 !$OMP MASTER
-      call exchange_halo_group(block % domain, 'dynamics:'//trim(field_name)//'_old', config_gpu_aware_mpi)
+      call exchange_halo_group(block % domain, 'dynamics:'//trim(field_name)//'_old')
 !$OMP END MASTER
 !$OMP BARRIER
 
-      MPAS_ACC_TIMER_START('atm_advance_scalars_mono [ACC_data_xfer]')
-      !$acc update device(scalars_old) if (.not. config_gpu_aware_mpi)
-      MPAS_ACC_TIMER_STOP('atm_advance_scalars_mono [ACC_data_xfer]')
 
       !
       ! Runge Kutta integration, so we compute fluxes from scalar_new values, update starts from scalar_old
@@ -4165,19 +4124,13 @@ module atm_time_integration
          !  communicate only first halo row in these next two exchanges
          !
 
-         MPAS_ACC_TIMER_START('atm_advance_scalars_mono [ACC_data_xfer]')
-         !$acc update self(scale_arr) if (.not. config_gpu_aware_mpi)
-         MPAS_ACC_TIMER_STOP('atm_advance_scalars_mono [ACC_data_xfer]')
 
 !$OMP BARRIER
 !$OMP MASTER
-         call exchange_halo_group(block % domain, 'dynamics:scale', config_gpu_aware_mpi)
+         call exchange_halo_group(block % domain, 'dynamics:scale')
 !$OMP END MASTER
 !$OMP BARRIER
 
-         MPAS_ACC_TIMER_START('atm_advance_scalars_mono [ACC_data_xfer]')
-         !$acc update device(scale_arr) if (.not. config_gpu_aware_mpi)
-         MPAS_ACC_TIMER_STOP('atm_advance_scalars_mono [ACC_data_xfer]')
 
          !$acc parallel
 
