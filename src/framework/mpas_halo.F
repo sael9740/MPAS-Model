@@ -174,6 +174,14 @@ module mpas_halo
         type (field2DReal), pointer :: r2d
         type (field3DReal), pointer :: r3d
         integer, pointer :: timeLevel
+        ! Local aliases for the index arrays. They exist only so the capture clause
+        ! below can name each array by a simple name: naming a derived-type component
+        ! path there compiles and even produces a device pointer, but leaves the
+        ! kernels reading the managed allocation (see mpas_halo.F's sendBuf comment).
+        integer, dimension(:,:), pointer :: nSendLists, nRecvLists
+        integer, dimension(:,:,:), pointer :: sendListSrc, sendListDst
+        integer, dimension(:,:,:), pointer :: recvListSrc, recvListDst
+        integer, dimension(:), pointer :: packOffsets, unpackOffsets
 
 
         if (present(iErr)) then
@@ -291,16 +299,52 @@ module mpas_halo
         ! Then the data in the members of the type
         !$acc enter data copyin(newGroup % recvBuf(:), newGroup % sendBuf(:))
         !$acc enter data copyin(newGroup % fields(:))
+        !
+        ! Give the eight per-field index arrays a discrete device allocation that lasts
+        ! for the lifetime of the group.
+        !
+        ! Under -gpu=mem:managed these arrays live in CUDA Managed Memory, because the
+        ! parent allocate() is rewritten to cudaMallocManaged. The NVHPC pool allocator
+        ! packs the group's small allocations 128 bytes apart, so each index array shares
+        ! 4 KB pages with host-only metadata -- sendRequests, compactHaloInfo, and the
+        ! groupSend/Recv arrays. A pack or unpack kernel reading an index array pulls the
+        ! whole page to the device; the next host write of an MPI request handle pulls it
+        ! straight back. That round trip happens once per field per exchange, 24,300
+        ! exchanges per run, and is the dominant cost of the hybrid data model.
+        !
+        ! The capture modifier breaks the sharing from the other side: the lists get their
+        ! own device memory, the kernels stop touching the managed pages, and those pages
+        ! simply stay resident on the CPU. The lists are built once by refactor_lists above
+        ! and never written again, so a single copyin here is sufficient -- any future code
+        ! that mutates them on the host would need an !$acc update device.
+        !
+        ! Without capture these clauses are no-ops under mem:managed: the allocation is
+        ! already unified, so the runtime has nothing to do. They matter for mem:separate.
+        !
+        ! Two requirements, both easy to break silently:
+        !   - Each array must be named by a simple name, hence the local aliases. The
+        !     kernels may reach it through a different local pointer; the present-table
+        !     lookup is by address, so the two bind.
+        !   - Every compute construct that reads one of these arrays must carry an explicit
+        !     present() clause for it. The hybrid build compiles !$acc parallel with an
+        !     empty ACC_DEFAULT_ARG (see the top-level Makefile), so without present() a
+        !     kernel never consults the present table and quietly uses the managed pointer
+        !     instead -- correct, but with none of the benefit.
+        !
         do i = 1, newGroup % nFields
             !$acc enter data copyin(newGroup % fields(i))
-            !$acc enter data copyin(newGroup % fields(i) % nSendLists(:,:))
-            !$acc enter data copyin(newGroup % fields(i) % packOffsets(:))
-            !$acc enter data copyin(newGroup % fields(i) % sendListSrc(:,:,:))
-            !$acc enter data copyin(newGroup % fields(i) % sendListDst(:,:,:))
-            !$acc enter data copyin(newGroup % fields(i) % nRecvLists(:,:))
-            !$acc enter data copyin(newGroup % fields(i) % unpackOffsets(:))
-            !$acc enter data copyin(newGroup % fields(i) % recvListSrc(:,:,:))
-            !$acc enter data copyin(newGroup % fields(i) % recvListDst(:,:,:))
+            nSendLists    => newGroup % fields(i) % nSendLists
+            packOffsets   => newGroup % fields(i) % packOffsets
+            sendListSrc   => newGroup % fields(i) % sendListSrc
+            sendListDst   => newGroup % fields(i) % sendListDst
+            nRecvLists    => newGroup % fields(i) % nRecvLists
+            unpackOffsets => newGroup % fields(i) % unpackOffsets
+            recvListSrc   => newGroup % fields(i) % recvListSrc
+            recvListDst   => newGroup % fields(i) % recvListDst
+            !$acc enter data copyin(capture: nSendLists(:,:), packOffsets(:)) &
+            !$acc                   copyin(capture: sendListSrc(:,:,:), sendListDst(:,:,:)) &
+            !$acc                   copyin(capture: nRecvLists(:,:), unpackOffsets(:)) &
+            !$acc                   copyin(capture: recvListSrc(:,:,:), recvListDst(:,:,:))
         end do
 
     end subroutine mpas_halo_exch_group_complete
@@ -331,6 +375,13 @@ module mpas_halo
         ! Local variables
         integer :: i
         type (mpas_halo_group), pointer :: cursor, prev
+        ! Local aliases, for the same reason as in mpas_halo_exch_group_complete: the
+        ! captured copies are registered against these arrays' addresses under a simple
+        ! name, so they must be released the same way.
+        integer, dimension(:,:), pointer :: nSendLists, nRecvLists
+        integer, dimension(:,:,:), pointer :: sendListSrc, sendListDst
+        integer, dimension(:,:,:), pointer :: recvListSrc, recvListDst
+        integer, dimension(:), pointer :: packOffsets, unpackOffsets
 
 
         if (present(iErr)) then
@@ -372,21 +423,25 @@ module mpas_halo
             deallocate(cursor % fields(i) % compactHaloInfo)
             deallocate(cursor % fields(i) % compactSendLists)
             deallocate(cursor % fields(i) % compactRecvLists)
-            !$acc exit data delete(cursor % fields(i) % nSendLists(:,:))
+            nSendLists    => cursor % fields(i) % nSendLists
+            packOffsets   => cursor % fields(i) % packOffsets
+            sendListSrc   => cursor % fields(i) % sendListSrc
+            sendListDst   => cursor % fields(i) % sendListDst
+            nRecvLists    => cursor % fields(i) % nRecvLists
+            unpackOffsets => cursor % fields(i) % unpackOffsets
+            recvListSrc   => cursor % fields(i) % recvListSrc
+            recvListDst   => cursor % fields(i) % recvListDst
+            !$acc exit data delete(nSendLists(:,:), packOffsets(:)) &
+            !$acc                  delete(sendListSrc(:,:,:), sendListDst(:,:,:)) &
+            !$acc                  delete(nRecvLists(:,:), unpackOffsets(:)) &
+            !$acc                  delete(recvListSrc(:,:,:), recvListDst(:,:,:))
             deallocate(cursor % fields(i) % nSendLists)
-            !$acc exit data delete(cursor % fields(i) % sendListSrc(:,:,:))
             deallocate(cursor % fields(i) % sendListSrc)
-            !$acc exit data delete(cursor % fields(i) % sendListDst(:,:,:))
             deallocate(cursor % fields(i) % sendListDst)
-            !$acc exit data delete(cursor % fields(i) % packOffsets(:))
             deallocate(cursor % fields(i) % packOffsets)
-            !$acc exit data delete(cursor % fields(i) % nRecvLists(:,:))
             deallocate(cursor % fields(i) % nRecvLists)
-            !$acc exit data delete(cursor % fields(i) % recvListSrc(:,:,:))
             deallocate(cursor % fields(i) % recvListSrc)
-            !$acc exit data delete(cursor % fields(i) % recvListDst(:,:,:))
             deallocate(cursor % fields(i) % recvListDst)
-            !$acc exit data delete(cursor % fields(i) % unpackOffsets(:))
             deallocate(cursor % fields(i) % unpackOffsets)
             !$acc exit data delete(cursor % fields(i))
         end do
@@ -721,7 +776,9 @@ module mpas_halo
                     !
                     ! Pack send buffer for all neighbors for current field
                     !
-                    !$acc parallel ACC_DEFAULT_ARG if(useGPUAwareMPI)
+                    !$acc parallel ACC_DEFAULT_ARG if(useGPUAwareMPI) &
+                    !$acc     present(sendListSrc(:,:,:), sendListDst(:,:,:)) &
+                    !$acc     present(nSendLists(:,:), packOffsets(:))
                     !$acc loop gang collapse(2)
                     do iEndp = 1, nSendEndpts
                         do iHalo = 1, nHalos
@@ -751,7 +808,9 @@ module mpas_halo
                     ! Present should also cause an attach action. OpenACC Spec2.7 Section 2.7.2 describes 'attach action'
                     ! !$acc data present(group) present(group % fields(i)) present(sbuf(:), group % fields(i) % sendListSrc(:,:,:))
 
-                    !$acc parallel ACC_DEFAULT_ARG if(useGPUAwareMPI)
+                    !$acc parallel ACC_DEFAULT_ARG if(useGPUAwareMPI) &
+                    !$acc     present(sendListSrc(:,:,:), sendListDst(:,:,:)) &
+                    !$acc     present(nSendLists(:,:), packOffsets(:))
                     !$acc loop gang collapse(3)
                     do iEndp = 1, nSendEndpts
                         do iHalo = 1, nHalos
@@ -779,7 +838,9 @@ module mpas_halo
                     !
                     ! Pack send buffer for all neighbors for current field
                     !
-                    !$acc parallel ACC_DEFAULT_ARG if(useGPUAwareMPI)
+                    !$acc parallel ACC_DEFAULT_ARG if(useGPUAwareMPI) &
+                    !$acc     present(sendListSrc(:,:,:), sendListDst(:,:,:)) &
+                    !$acc     present(nSendLists(:,:), packOffsets(:))
                     !$acc loop gang collapse(4)
                     do iEndp = 1, nSendEndpts
                         do iHalo = 1, nHalos
@@ -871,7 +932,9 @@ module mpas_halo
                         ! Unpack recv buffer from all neighbors for current field
                         !
                         r1arr => group % fields(i) % r1arr
-                        !$acc parallel ACC_DEFAULT_ARG if(useGPUAwareMPI)
+                        !$acc parallel ACC_DEFAULT_ARG if(useGPUAwareMPI) &
+                        !$acc     present(recvListSrc(:,:,:), recvListDst(:,:,:)) &
+                        !$acc     present(nRecvLists(:,:), unpackOffsets(:))
                         !$acc loop gang vector collapse(2)
                         do iHalo = 1, nHalos
                             do j = 1, maxNRecvList
@@ -891,7 +954,9 @@ module mpas_halo
                         ! Unpack recv buffer from all neighbors for current field
                         !
                         r2arr => group % fields(i) % r2arr
-                        !$acc parallel ACC_DEFAULT_ARG if(useGPUAwareMPI)
+                        !$acc parallel ACC_DEFAULT_ARG if(useGPUAwareMPI) &
+                        !$acc     present(recvListSrc(:,:,:), recvListDst(:,:,:)) &
+                        !$acc     present(nRecvLists(:,:), unpackOffsets(:))
                         !$acc loop gang collapse(2)
                         do iHalo = 1, nHalos
                             do j = 1, maxNRecvList
@@ -914,7 +979,9 @@ module mpas_halo
                         ! Unpack recv buffer from all neighbors for current field
                         !
                         r3arr => group % fields(i) % r3arr
-                        !$acc parallel ACC_DEFAULT_ARG if(useGPUAwareMPI)
+                        !$acc parallel ACC_DEFAULT_ARG if(useGPUAwareMPI) &
+                        !$acc     present(recvListSrc(:,:,:), recvListDst(:,:,:)) &
+                        !$acc     present(nRecvLists(:,:), unpackOffsets(:))
                         !$acc loop gang collapse(2)
                         do iHalo = 1, nHalos
                             do j = 1, maxNRecvList
