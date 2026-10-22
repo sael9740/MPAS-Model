@@ -12,13 +12,16 @@ endif
 # them in separate memory, while the hybrid model leans on the compiler's
 # implicit data regions and is simplest when host and device share an address
 # space. ACC_DEVICE_RESIDENT itself defaults to the hybrid model, so an
-# unqualified build gets mem:unified. An explicit GPU_MEM_MODE= on the make
-# command line overrides this.
+# unqualified build gets mem:managed, which provides that shared space on any
+# CUDA-capable GPU. mem:unified also needs system-wide address translation from
+# the hardware and driver, which makes it the better mode where it is available
+# but a poor default. An explicit GPU_MEM_MODE= on the make command line
+# overrides this.
 ifeq "$(GPU_MEM_MODE)" ""
 ifeq "$(ACC_DEVICE_RESIDENT)" "true"
         GPU_MEM_MODE = separate
 else
-        GPU_MEM_MODE = unified
+        GPU_MEM_MODE = managed
 endif
 endif
 ACC_MEM_MODE = ,mem:$(GPU_MEM_MODE)
@@ -1754,7 +1757,7 @@ errmsg:
 	@echo "    OPENACC=true  - builds and links with OpenACC flags. Default is to not use OpenACC."
 	@echo "    ACC_DEVICE_RESIDENT=true - builds the GPU-resident OpenACC data model, where device-used fields stay resident for the lifetime of their host-side allocation (requires OPENACC=true). Default is the hybrid/development data model, where data regions around each ported section perform real host/device transfers so that unported host code still sees correct values."
 	@echo "    MPAS_NVTX=true - instruments all MPAS timers with NVTX profiling regions (requires nvhpc). Default is to not use NVTX."
-	@echo "    GPU_MEM_MODE=<separate|managed|unified>[:suboption[:suboption...]] - selects the OpenACC GPU memory model via -gpu=mem:<...> (requires nvhpc), e.g. GPU_MEM_MODE=unified:managedalloc maps to -gpu=mem:unified:managedalloc. Default follows ACC_DEVICE_RESIDENT: separate for the GPU-resident model, unified for the hybrid model."
+	@echo "    GPU_MEM_MODE=<separate|managed|unified>[:suboption[:suboption...]] - selects the OpenACC GPU memory model via -gpu=mem:<...> (requires nvhpc), e.g. GPU_MEM_MODE=unified:managedalloc maps to -gpu=mem:unified:managedalloc. Default follows ACC_DEVICE_RESIDENT: separate for the GPU-resident model, managed for the hybrid model."
 	@echo "    NVHPC_BFB=true - adds -Mnofma (CPU/GPU) and -gpu=math_uniform (GPU) so nvhpc GPU builds are bit-for-bit reproducible against nvhpc CPU builds (requires nvhpc). Default is off."
 	@echo "    PRECISION=double - builds with default double-precision real kind. Default is to use single-precision."
 	@echo "    SHAREDLIB=true - generate position-independent code suitable for use in a shared library. Default is false."
