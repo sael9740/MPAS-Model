@@ -62,6 +62,7 @@ module atm_core
 
       real (kind=RKIND), pointer :: nominalMinDc
       real (kind=RKIND), pointer :: config_len_disp
+      logical, pointer :: config_gpu_aware_mpi
       real (kind=RKIND), pointer :: Time
 
       integer, pointer :: nVertLevels, maxEdges, maxEdges2, num_scalars
@@ -238,7 +239,20 @@ module atm_core
       startTime = mpas_get_clock_time(clock, MPAS_START_TIME, ierr)
       call mpas_get_time(startTime, dateTimeString=startTimeStamp) 
 
-      call exchange_halo_group(domain, 'initialization:u')
+      !
+      ! Pass config_gpu_aware_mpi exactly as every exchange in the dynamics does.
+      ! withGPUAwareMPI is optional and defaults to .false., which makes the pack
+      ! and unpack kernels in mpas_halo.F run on the host (they are guarded by
+      ! `if(useGPUAwareMPI)`). Under -gpu=mem:managed that is merely slow, because
+      ! host and device share the allocation. Under -gpu=mem:separate the host-side
+      ! unpack writes the halo into the HOST array and the device copy's halo is
+      ! never updated, so the GPU-resident run starts integrating from halo values
+      ! that were never exchanged.
+      !
+      nullify(config_gpu_aware_mpi)
+      call mpas_pool_get_config(domain % blocklist % configs, 'config_gpu_aware_mpi', config_gpu_aware_mpi)
+
+      call exchange_halo_group(domain, 'initialization:u', config_gpu_aware_mpi)
 
 
       !
@@ -276,7 +290,7 @@ module atm_core
           block => block % next
       end do
 
-      call exchange_halo_group(domain, 'initialization:pv_edge,ru,rw')
+      call exchange_halo_group(domain, 'initialization:pv_edge,ru,rw', config_gpu_aware_mpi)
 
       call mpas_atm_diag_setup(domain % streamManager, domain % blocklist % configs, &
                                domain % blocklist % structs, domain % clock, domain % dminfo)
