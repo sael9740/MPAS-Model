@@ -54,7 +54,6 @@ gnu:   # BUILDTARGET GNU Fortran, C, and C++ compilers
 	"USE_PAPI = $(USE_PAPI)" \
 	"OPENMP = $(OPENMP)" \
 	"OPENACC = $(OPENACC)" \
-	"MPAS_NVTX = $(MPAS_NVTX)" \
 	"CPPFLAGS = $(MODEL_FORMULATION) -D_MPI" )
 
 xlf:   # BUILDTARGET IBM XL compilers
@@ -137,7 +136,6 @@ ftn:   # BUILDTARGET Cray compilers
 	"USE_PAPI = $(USE_PAPI)" \
 	"OPENMP = $(OPENMP)" \
 	"OPENACC = $(OPENACC)" \
-	"MPAS_NVTX = $(MPAS_NVTX)" \
 	"CPPFLAGS = $(MODEL_FORMULATION) -D_MPI" )
 
 titan-cray:   # BUILDTARGET (deprecated) Cray compilers with options for ORNL Titan
@@ -223,7 +221,6 @@ pgi:   # BUILDTARGET PGI compiler suite
 	"USE_PAPI = $(USE_PAPI)" \
 	"OPENMP = $(OPENMP)" \
 	"OPENACC = $(OPENACC)" \
-	"MPAS_NVTX = $(MPAS_NVTX)" \
 	"CPPFLAGS = $(MODEL_FORMULATION) -D_MPI -DCPRPGI" )
 
 pgi-summit:   # BUILDTARGET PGI compiler suite w/OpenACC options for ORNL Summit
@@ -254,7 +251,6 @@ pgi-summit:   # BUILDTARGET PGI compiler suite w/OpenACC options for ORNL Summit
 	"USE_PAPI = $(USE_PAPI)" \
 	"OPENMP = $(OPENMP)" \
 	"OPENACC = $(OPENACC)" \
-	"MPAS_NVTX = $(MPAS_NVTX)" \
 	"CPPFLAGS = -DpgiFortran -D_MPI -DUNDERSCORE" )
 
 pgi-nersc:   # BUILDTARGET (deprecated) PGI compilers on NERSC machines
@@ -435,7 +431,6 @@ gfortran:   # BUILDTARGET GNU Fortran, C, and C++ compilers
 	"USE_PAPI = $(USE_PAPI)" \
 	"OPENMP = $(OPENMP)" \
 	"OPENACC = $(OPENACC)" \
-	"MPAS_NVTX = $(MPAS_NVTX)" \
 	"CPPFLAGS = $(MODEL_FORMULATION) -D_MPI" )
 
 gfortran-clang:   # BUILDTARGET GNU Fortran compiler with LLVM clang/clang++ compilers
@@ -964,9 +959,13 @@ else
 endif
 endif #NVHPC_BFB IF
 
+# MPAS_NVTX=true is only plumbed through from the nvhpc target, which is the
+# only one supplying the nvtx Fortran module that mpas_timer.F uses. The name of
+# the library holding that module has changed across releases, so let the
+# compiler driver select it rather than naming it here.
 ifeq "$(MPAS_NVTX)" "true"
         override CPPFLAGS += "-DMPAS_NVTX"
-        override LIBS += "-lnvhpcwrapnvtx"
+        override LIBS += "-cudalib=nvtx3"
 endif #MPAS_NVTX IF
 
 ifeq "$(OPENMP_OFFLOAD)" "true"
