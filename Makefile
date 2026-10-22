@@ -929,6 +929,17 @@ ifeq "$(ACC_DEVICE_RESIDENT)" "true"
 else
         override CPPFLAGS += '-DACC_DEFAULT_ARG='
 endif #ACC_DEVICE_RESIDENT IF
+
+# ACC_CAPTURE_ARG is the capture data-clause modifier, which gives a variable a
+# discrete device allocation even where host and device share memory. Compiler
+# support for it on unstructured data clauses varies, so it is injected only for
+# build targets known to accept it. Expanding to nothing elsewhere is equivalent
+# wherever device memory is already discrete, which is every other target here.
+ifneq "$(filter nvhpc%,$(BUILD_TARGET))" ""
+        override CPPFLAGS += '-DACC_CAPTURE_ARG=capture:'
+else
+        override CPPFLAGS += '-DACC_CAPTURE_ARG='
+endif #ACC_CAPTURE_ARG IF
 endif #OPENACC IF
 
 # NVHPC_BFB=true keeps nvhpc GPU builds bit-for-bit reproducible against

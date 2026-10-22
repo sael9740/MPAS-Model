@@ -289,18 +289,27 @@ module mpas_halo
         ! Always copy in the main data member first
         !$acc enter data copyin(newGroup)
         ! Then the data in the members of the type
-        !$acc enter data copyin(newGroup % recvBuf(:), newGroup % sendBuf(:))
+        ! The capture modifier asks for a discrete device copy of data that host and
+        ! device would otherwise share, and binds device references to that copy.
+        ! Here it is what lets host_data use_device in the exchange hand MPI a true
+        ! device pointer rather than a shared one.
+        !$acc enter data copyin(ACC_CAPTURE_ARG newGroup % recvBuf(:), newGroup % sendBuf(:))
         !$acc enter data copyin(newGroup % fields(:))
+        ! capture likewise separates the index arrays from the host-written metadata
+        ! they are allocated alongside, which otherwise shares pages with them and
+        ! migrates back and forth on every pack and unpack. refactor_lists above is
+        ! their only writer, so one copyin here is sufficient; a later host-side write
+        ! would need an !$acc update device.
         do i = 1, newGroup % nFields
             !$acc enter data copyin(newGroup % fields(i))
-            !$acc enter data copyin(newGroup % fields(i) % nSendLists(:,:))
-            !$acc enter data copyin(newGroup % fields(i) % packOffsets(:))
-            !$acc enter data copyin(newGroup % fields(i) % sendListSrc(:,:,:))
-            !$acc enter data copyin(newGroup % fields(i) % sendListDst(:,:,:))
-            !$acc enter data copyin(newGroup % fields(i) % nRecvLists(:,:))
-            !$acc enter data copyin(newGroup % fields(i) % unpackOffsets(:))
-            !$acc enter data copyin(newGroup % fields(i) % recvListSrc(:,:,:))
-            !$acc enter data copyin(newGroup % fields(i) % recvListDst(:,:,:))
+            !$acc enter data copyin(ACC_CAPTURE_ARG newGroup % fields(i) % nSendLists(:,:))
+            !$acc enter data copyin(ACC_CAPTURE_ARG newGroup % fields(i) % packOffsets(:))
+            !$acc enter data copyin(ACC_CAPTURE_ARG newGroup % fields(i) % sendListSrc(:,:,:))
+            !$acc enter data copyin(ACC_CAPTURE_ARG newGroup % fields(i) % sendListDst(:,:,:))
+            !$acc enter data copyin(ACC_CAPTURE_ARG newGroup % fields(i) % nRecvLists(:,:))
+            !$acc enter data copyin(ACC_CAPTURE_ARG newGroup % fields(i) % unpackOffsets(:))
+            !$acc enter data copyin(ACC_CAPTURE_ARG newGroup % fields(i) % recvListSrc(:,:,:))
+            !$acc enter data copyin(ACC_CAPTURE_ARG newGroup % fields(i) % recvListDst(:,:,:))
         end do
 
     end subroutine mpas_halo_exch_group_complete
@@ -643,21 +652,9 @@ module mpas_halo
 #endif
         rank = group % fields(1) % compactHaloInfo(8)
 
-        ! Give the two MPI staging buffers a real device allocation for the duration of
-        ! the exchange. Under -gpu=mem:managed an `enter data` on them is a no-op -- the
-        ! allocation is already unified -- so `host_data use_device` below would hand MPI
-        ! a managed pointer. UCX cannot tell where managed pages live, assumes the CPU
-        ! (its CUDA_COPY_PREF_LOC default), picks a host transport, and then touches the
-        ! pages from the CPU, dragging them off the device. The capture modifier gives
-        ! these two buffers discrete device memory while the rest of the program stays
-        ! managed, so use_device yields a true device pointer.
-        !
-        ! The buffers MUST be referenced through the associate names below, in both the
-        ! data clause and every compute construct. Naming `group % sendBuf` directly in
-        ! a capture clause compiles and even produces a device pointer, but the kernels
-        ! keep writing the managed allocation -- MPI then sends an unwritten buffer.
+        ! sbuf/rbuf are shorthand; the buffers are captured for the group's lifetime
+        ! in mpas_halo_exch_group_complete.
         associate(sbuf => group % sendBuf, rbuf => group % recvBuf)
-        !$acc data create(capture: sbuf(:), rbuf(:))
 
         !
         ! Initiate non-blocking MPI receives for all neighbors
@@ -949,7 +946,6 @@ module mpas_halo
         !
         call MPI_Waitall(group % nGroupSendNeighbors, group % sendRequests, MPI_STATUSES_IGNORE, mpi_ierr)
 
-        !$acc end data
         end associate
 
     end subroutine mpas_halo_exch_group_full_halo_exch
