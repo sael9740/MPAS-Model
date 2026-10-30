@@ -1646,7 +1646,7 @@ module atm_time_integration
       call mpas_pool_get_array(state, 'scalars', scalars_2, 2)
 
 
-      !$acc kernels
+      !$acc kernels default(present)
       theta_m_2(:,cellEnd+1) = 0.0_RKIND
       !$acc end kernels
 
@@ -3268,7 +3268,7 @@ module atm_time_integration
       weight_time_old = 1. - weight_time_new
 
 
-      !$acc parallel async
+      !$acc parallel default(present) async
       !$acc loop gang worker private(scalar_weight2, ica)
       do iEdge=edgeStart,edgeEnd
 
@@ -3365,7 +3365,7 @@ module atm_time_integration
       !$acc enter data create(scalar_tend_column)
       MPAS_ACC_TIMER_STOP('atm_advance_scalars [ACC_data_xfer]')
 
-      !$acc parallel wait
+      !$acc parallel default(present) wait
       !$acc loop gang worker private(scalar_tend_column, wdtn)
       do iCell=cellSolveStart,cellSolveEnd
 
@@ -3702,7 +3702,7 @@ module atm_time_integration
       !  The transport will maintain this positive definite solution and optionally, shape preservation (monotonicity).
 
 
-      !$acc parallel
+      !$acc parallel default(present)
 
       !$acc loop gang worker
       do iCell=cellSolveStart,cellSolveEnd
@@ -3740,7 +3740,7 @@ module atm_time_integration
             call mpas_log_write('Error: rho_zz_int not supplied to atm_advance_scalars_mono_work( ) when advance_density=.true.', messageType=MPAS_LOG_CRIT)
          end if
 
-         !$acc parallel
+         !$acc parallel default(present)
 
          !  begin with update of density
 
@@ -3784,7 +3784,7 @@ module atm_time_integration
 
       do iScalar = 1, num_scalars
 
-         !$acc parallel
+         !$acc parallel default(present)
 
          !$acc loop gang worker
          do iCell=cellStart,cellEnd
@@ -3833,7 +3833,7 @@ module atm_time_integration
          call mpas_log_write(' scmin, scmin new in ', realArgs=(/scmin,scmax/))
 #endif
 
-         !$acc parallel
+         !$acc parallel default(present)
 
          !
          !  vertical flux divergence, and min and max bounds for flux limiter
@@ -3912,7 +3912,7 @@ module atm_time_integration
 
 !$OMP BARRIER
 
-         !$acc parallel
+         !$acc parallel default(present)
 
          !
          !  horizontal flux divergence
@@ -3981,7 +3981,7 @@ module atm_time_integration
 
 !$OMP BARRIER
 
-         !$acc parallel
+         !$acc parallel default(present)
 
          !
          !  vertical flux divergence for upwind update, we will put upwind update into scalar_new, and put factor of dt in fluxes
@@ -4055,7 +4055,7 @@ module atm_time_integration
 
 !$OMP BARRIER
 
-         !$acc parallel
+         !$acc parallel default(present)
 
          !$acc loop gang worker
          do iCell=cellSolveStart,cellSolveEnd
@@ -4132,7 +4132,7 @@ module atm_time_integration
 !$OMP BARRIER
 
 
-         !$acc parallel
+         !$acc parallel default(present)
 
          !$acc loop gang worker
          do iEdge=edgeStart,edgeEnd
@@ -4189,7 +4189,7 @@ module atm_time_integration
 
 !$OMP BARRIER
 
-         !$acc parallel
+         !$acc parallel default(present)
  
          !$acc loop gang worker
          do iCell=cellSolveStart,cellSolveEnd
@@ -4261,7 +4261,7 @@ module atm_time_integration
          ! hence the enforcement of PD in the copy back to the model state.
 !$OMP BARRIER
 
-         !$acc parallel
+         !$acc parallel default(present)
 
          !$acc loop gang worker
          do iCell=cellStart,cellEnd
@@ -6224,7 +6224,7 @@ module atm_time_integration
 
       ! Interim fix for the atm_compute_dyn_tend_work subroutine accessing uninitialized values
       ! in garbage cells of theta_m
-      !$acc kernels
+      !$acc kernels default(present)
       theta_m_1(:,cellEnd+1) = 0.0_RKIND
       !$acc end kernels
 
