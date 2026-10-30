@@ -1788,10 +1788,20 @@ module atm_core
       real (kind=RKIND) :: area_cell, sint2, cost2, sint_cost, dx, dy
 
       real(kind=RKIND), pointer :: x_period, y_period
+      ! Plain copies of the two config scalars. mpas_pool_get_config hands back
+      ! POINTERS, and a Fortran scalar pointer is aggregate data to OpenACC
+      ! rather than something firstprivate, so default(present) on the loop
+      ! below requires the pointee to be resident -- which it never is. Before
+      ! that clause was added the compiler papered over this with an implicit
+      ! copy on every call. Dereferencing here is what the dycore does with
+      ! every other pool scalar.
+      real(kind=RKIND) :: xper, yper
 
 
       call mpas_pool_get_config(mesh, 'x_period', x_period)
       call mpas_pool_get_config(mesh, 'y_period', y_period)
+      xper = x_period
+      yper = y_period
 
       call mpas_pool_get_array(mesh, 'deformation_coef_c2', deformation_coef_c2)
       call mpas_pool_get_array(mesh, 'deformation_coef_s2', deformation_coef_s2)
@@ -1918,15 +1928,15 @@ module atm_core
             !$acc loop seq
             do i=1,n-1
                iv = verticesOnCell(i,iCell)
-               xp(i) = mpas_fix_periodicity(xVertex(iv),xCell(iCell),x_period) - xCell(iCell)
-               yp(i) = mpas_fix_periodicity(yVertex(iv),yCell(iCell),y_period) - yCell(iCell)
+               xp(i) = mpas_fix_periodicity(xVertex(iv),xCell(iCell),xper) - xCell(iCell)
+               yp(i) = mpas_fix_periodicity(yVertex(iv),yCell(iCell),yper) - yCell(iCell)
             end do
 
             !$acc loop seq
             do i=1,n-1
                ie = edgesOnCell(i,iCell)
-               xe = mpas_fix_periodicity(xEdge(ie),xCell(iCell),x_period) - xCell(iCell)
-               ye = mpas_fix_periodicity(yEdge(ie),yCell(iCell),y_period) - yCell(iCell)
+               xe = mpas_fix_periodicity(xEdge(ie),xCell(iCell),xper) - xCell(iCell)
+               ye = mpas_fix_periodicity(yEdge(ie),yCell(iCell),yper) - yCell(iCell)
 ! atan2 is not covered by -gpu=math_uniform and differs by 1 ulp between host and
 ! device, so a bit-for-bit validation build substitutes atm_atan2_bfb (see below).
 #ifdef MPAS_BFB
