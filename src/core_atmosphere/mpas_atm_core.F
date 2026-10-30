@@ -1366,6 +1366,7 @@ module atm_core
       integer, pointer :: nCells, nVertLevels
       integer :: nCells_acc, nVertLevels_acc
       real (kind=RKIND), pointer :: config_xnutr, config_zd
+      real (kind=RKIND) :: config_xnutr_acc, config_zd_acc
       real (kind=RKIND) :: z, zt, m1, pii
       real (kind=RKIND), dimension(:,:), pointer :: dss, zgrid
 
@@ -1388,6 +1389,12 @@ module atm_core
 
       call mpas_pool_get_config(configs, 'config_zd', config_zd)
       call mpas_pool_get_config(configs, 'config_xnutr', config_xnutr)
+      ! mpas_pool_get_config returns a POINTER, and a Fortran scalar pointer is
+      ! aggregate data to OpenACC rather than something firstprivate, so
+      ! default(present) requires the pointee to be resident and it never is.
+      ! Dereference first, as the dimensions above already do.
+      config_zd_acc    = config_zd
+      config_xnutr_acc = config_xnutr
 
       !$acc kernels default(present)
       dss(:,:) = 0.0
@@ -1399,8 +1406,8 @@ module atm_core
          !$acc loop vector
          do k=1,nVertLevels_acc
             z = 0.5*(zgrid(k,iCell) + zgrid(k+1,iCell))
-            if (z > config_zd) then
-               dss(k,iCell) = config_xnutr*sin(0.5*pii*(z-config_zd)/(zt-config_zd))**2.0
+            if (z > config_zd_acc) then
+               dss(k,iCell) = config_xnutr_acc*sin(0.5*pii*(z-config_zd_acc)/(zt-config_zd_acc))**2.0
             end if
          end do
       end do
@@ -1669,15 +1676,22 @@ module atm_core
       real (kind=RKIND), dimension(:,:), pointer :: adv_coefs_3rd
       real (kind=RKIND), dimension(:,:,:), pointer :: zb3_cell
       real (kind=RKIND), pointer :: config_coef_3rd_order
+      real (kind=RKIND) :: config_coef_3rd_order_acc
 
       call mpas_pool_get_array(mesh, 'zb3_cell', zb3_cell)
       call mpas_pool_get_array(mesh, 'adv_coefs_3rd', adv_coefs_3rd)
 
       call mpas_pool_get_config(configs, 'config_coef_3rd_order', config_coef_3rd_order)
 
+      ! mpas_pool_get_config returns a POINTER, and a Fortran scalar pointer is
+      ! aggregate data to OpenACC rather than something firstprivate, so
+      ! default(present) requires the pointee to be resident and it never is.
+      ! Dereference first, as the dimensions above already do.
+      config_coef_3rd_order_acc = config_coef_3rd_order
+
       !$acc kernels default(present)
-      adv_coefs_3rd(:,:) = config_coef_3rd_order * adv_coefs_3rd(:,:)
-      zb3_cell(:,:,:) = config_coef_3rd_order * zb3_cell(:,:,:)
+      adv_coefs_3rd(:,:) = config_coef_3rd_order_acc * adv_coefs_3rd(:,:)
+      zb3_cell(:,:,:) = config_coef_3rd_order_acc * zb3_cell(:,:,:)
       !$acc end kernels
 
    end subroutine atm_couple_coef_3rd_order
@@ -1795,13 +1809,13 @@ module atm_core
       ! that clause was added the compiler papered over this with an implicit
       ! copy on every call. Dereferencing here is what the dycore does with
       ! every other pool scalar.
-      real(kind=RKIND) :: xper, yper
+      real(kind=RKIND) :: x_period_acc, y_period_acc
 
 
       call mpas_pool_get_config(mesh, 'x_period', x_period)
       call mpas_pool_get_config(mesh, 'y_period', y_period)
-      xper = x_period
-      yper = y_period
+      x_period_acc = x_period
+      y_period_acc = y_period
 
       call mpas_pool_get_array(mesh, 'deformation_coef_c2', deformation_coef_c2)
       call mpas_pool_get_array(mesh, 'deformation_coef_s2', deformation_coef_s2)
@@ -1934,15 +1948,15 @@ module atm_core
             !$acc loop seq
             do i=1,n-1
                iv = verticesOnCell(i,iCell)
-               xp(i) = mpas_fix_periodicity(xVertex(iv),xCell(iCell),xper) - xCell(iCell)
-               yp(i) = mpas_fix_periodicity(yVertex(iv),yCell(iCell),yper) - yCell(iCell)
+               xp(i) = mpas_fix_periodicity(xVertex(iv),xCell(iCell),x_period_acc) - xCell(iCell)
+               yp(i) = mpas_fix_periodicity(yVertex(iv),yCell(iCell),y_period_acc) - yCell(iCell)
             end do
 
             !$acc loop seq
             do i=1,n-1
                ie = edgesOnCell(i,iCell)
-               xe = mpas_fix_periodicity(xEdge(ie),xCell(iCell),xper) - xCell(iCell)
-               ye = mpas_fix_periodicity(yEdge(ie),yCell(iCell),yper) - yCell(iCell)
+               xe = mpas_fix_periodicity(xEdge(ie),xCell(iCell),x_period_acc) - xCell(iCell)
+               ye = mpas_fix_periodicity(yEdge(ie),yCell(iCell),y_period_acc) - yCell(iCell)
 ! atan2 is not covered by -gpu=math_uniform and differs by 1 ulp between host and
 ! device, so a bit-for-bit validation build substitutes atm_atan2_bfb (see below).
 #ifdef MPAS_BFB
