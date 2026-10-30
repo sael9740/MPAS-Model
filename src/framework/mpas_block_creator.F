@@ -1678,7 +1678,7 @@ module mpas_block_creator
 #ifdef MPAS_OPENACC
                            fillR1 => real1DField % array
                            fillDefR = real1DField % defaultValue
-                           !$acc kernels copyout(fillR1(:))
+                           !$acc kernels default(present) copyout(fillR1(:))
                            fillR1(:) = fillDefR
                            !$acc end kernels
                            ! Stream I/O never writes the trailing garbage element, so on the host it would
@@ -1723,7 +1723,7 @@ module mpas_block_creator
 #ifdef MPAS_OPENACC
                            fillR2 => real2DField % array
                            fillDefR = real2DField % defaultValue
-                           !$acc kernels copyout(fillR2(:,:))
+                           !$acc kernels default(present) copyout(fillR2(:,:))
                            fillR2(:,:) = fillDefR
                            !$acc end kernels
                            ! Stream I/O never writes the trailing garbage element, so on the host it would
@@ -1770,7 +1770,7 @@ module mpas_block_creator
 #ifdef MPAS_OPENACC
                            fillR3 => real3DField % array
                            fillDefR = real3DField % defaultValue
-                           !$acc kernels copyout(fillR3(:,:,:))
+                           !$acc kernels default(present) copyout(fillR3(:,:,:))
                            fillR3(:,:,:) = fillDefR
                            !$acc end kernels
                            ! Stream I/O never writes the trailing garbage element, so on the host it would
@@ -1819,7 +1819,7 @@ module mpas_block_creator
 #ifdef MPAS_OPENACC
                            fillR4 => real4DField % array
                            fillDefR = real4DField % defaultValue
-                           !$acc kernels copyout(fillR4(:,:,:,:))
+                           !$acc kernels default(present) copyout(fillR4(:,:,:,:))
                            fillR4(:,:,:,:) = fillDefR
                            !$acc end kernels
                            ! Stream I/O never writes the trailing garbage element, so on the host it would
@@ -1869,7 +1869,7 @@ module mpas_block_creator
 #ifdef MPAS_OPENACC
                            fillR5 => real5DField % array
                            fillDefR = real5DField % defaultValue
-                           !$acc kernels copyout(fillR5(:,:,:,:,:))
+                           !$acc kernels default(present) copyout(fillR5(:,:,:,:,:))
                            fillR5(:,:,:,:,:) = fillDefR
                            !$acc end kernels
                            ! Stream I/O never writes the trailing garbage element, so on the host it would
@@ -1914,7 +1914,7 @@ module mpas_block_creator
 #ifdef MPAS_OPENACC
                            fillI1 => int1DField % array
                            fillDefI = int1DField % defaultValue
-                           !$acc kernels copyout(fillI1(:))
+                           !$acc kernels default(present) copyout(fillI1(:))
                            fillI1(:) = fillDefI
                            !$acc end kernels
                            ! Stream I/O never writes the trailing garbage element, so on the host it would
@@ -1959,7 +1959,7 @@ module mpas_block_creator
 #ifdef MPAS_OPENACC
                            fillI2 => int2DField % array
                            fillDefI = int2DField % defaultValue
-                           !$acc kernels copyout(fillI2(:,:))
+                           !$acc kernels default(present) copyout(fillI2(:,:))
                            fillI2(:,:) = fillDefI
                            !$acc end kernels
                            ! Stream I/O never writes the trailing garbage element, so on the host it would
@@ -2006,7 +2006,7 @@ module mpas_block_creator
 #ifdef MPAS_OPENACC
                            fillI3 => int3DField % array
                            fillDefI = int3DField % defaultValue
-                           !$acc kernels copyout(fillI3(:,:,:))
+                           !$acc kernels default(present) copyout(fillI3(:,:,:))
                            fillI3(:,:,:) = fillDefI
                            !$acc end kernels
                            ! Stream I/O never writes the trailing garbage element, so on the host it would
@@ -2050,7 +2050,7 @@ module mpas_block_creator
 #ifdef MPAS_OPENACC
                            fillC1 => char1DField % array
                            fillDefC = char1DField % defaultValue
-                           !$acc kernels copyout(fillC1(:))
+                           !$acc kernels default(present) copyout(fillC1(:))
                            fillC1(:) = fillDefC
                            !$acc end kernels
                            ! Stream I/O never writes the trailing garbage element, so on the host it would

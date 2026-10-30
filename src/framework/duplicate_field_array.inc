@@ -84,7 +84,7 @@
                ! probably a cleaner way to express the copy that avoids it. Naming the array
                ! section explicitly is not that way -- measured identical, and the shared .inc
                ! cannot express a per-rank section anyway.
-               !$acc kernels
+               !$acc kernels default(present)
                dst_cursor % array = src_cursor % array
                !$acc end kernels
                ! These mirror the clauses above and restore the prior residency state exactly,
