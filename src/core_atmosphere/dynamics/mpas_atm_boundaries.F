@@ -708,14 +708,14 @@ module mpas_atm_boundaries
         ! NB: The specZoneMask{Cell,Edge,Vertex} fields receive a default value of 0.0 from the Registry,
         !     so no need to initialize them here
         !
-        !$acc kernels
+        !$acc kernels default(present)
         where (bdyMaskCell(:) > nRelaxZone) specZoneMaskCell(:) = 1.0_RKIND
         where (bdyMaskEdge(:) > nRelaxZone) specZoneMaskEdge(:) = 1.0_RKIND
         where (bdyMaskVertex(:) > nRelaxZone) specZoneMaskVertex(:) = 1.0_RKIND
         !$acc end kernels
 
 
-        !$acc kernels
+        !$acc kernels default(present)
         nearestRelaxationCell(:) = nCells_acc+1
         !$acc end kernels
 
@@ -723,7 +723,7 @@ module mpas_atm_boundaries
         ! For nearest relaxation cell to inner specified zone, just search
         ! all cellsOnCell with bdyMaskCell == nRelaxZone
         !
-        !$acc parallel
+        !$acc parallel default(present)
         !$acc loop gang vector
         do iCell=1,nCells_acc
             if (bdyMaskCell(iCell) == (nRelaxZone+1)) then
@@ -747,7 +747,7 @@ module mpas_atm_boundaries
         ! For nearest relaxation cell to outer specified zone, search
         ! all cellsOnCell of cellsOnCell
         !
-        !$acc parallel
+        !$acc parallel default(present)
         !$acc loop gang vector
         do iCell=1,nCells_acc
             if (bdyMaskCell(iCell) == (nRelaxZone+2)) then

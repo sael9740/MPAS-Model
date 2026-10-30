@@ -458,28 +458,28 @@ module atm_core
       nEdges = nEdges_ptr
       nVertices = nVertices_ptr
  
-      !$acc parallel
+      !$acc parallel default(present)
       !$acc loop gang vector
       do iCell=1,nCells 
          invAreaCell(iCell) = 1.0_RKIND / areaCell(iCell)
       end do
       !$acc end parallel
         
-      !$acc parallel
+      !$acc parallel default(present)
       !$acc loop gang vector
       do iEdge=1,nEdges 
          invDvEdge(iEdge) = 1.0_RKIND / dvEdge(iEdge)
       end do
       !$acc end parallel
       
-      !$acc parallel
+      !$acc parallel default(present)
       !$acc loop gang vector
       do iEdge=1,nEdges 
          invDcEdge(iEdge) = 1.0_RKIND / dcEdge(iEdge)
       end do
       !$acc end parallel
       
-      !$acc parallel
+      !$acc parallel default(present)
       !$acc loop gang vector
       do iVertex=1,nVertices
          invAreaTriangle(iVertex) = 1.0_RKIND / areaTriangle(iVertex)
@@ -1195,12 +1195,12 @@ module atm_core
       !
       ! Compute the scaling factors to be used in the del2 and del4 dissipation
       !
-      !$acc kernels
+      !$acc kernels default(present)
       meshScalingDel2(:) = 1.0
       meshScalingDel4(:) = 1.0
       !$acc end kernels
       if (config_h_ScaleWithMesh) then
-         !$acc parallel
+         !$acc parallel default(present)
          !$acc loop gang vector
          do iEdge=1,nEdges_acc
             cell1 = cellsOnEdge(1,iEdge)
@@ -1214,12 +1214,12 @@ module atm_core
       !
       ! Compute the scaling factors to be used in relaxation zone of regional configuration
       !
-      !$acc kernels
+      !$acc kernels default(present)
       meshScalingRegionalCell(:) = 1.0
       meshScalingRegionalEdge(:) = 1.0
       !$acc end kernels
       if (config_h_ScaleWithMesh) then
-         !$acc parallel
+         !$acc parallel default(present)
          !$acc loop gang vector
          do iEdge=1,nEdges_acc
             cell1 = cellsOnEdge(1,iEdge)
@@ -1228,7 +1228,7 @@ module atm_core
          end do
          !$acc end parallel
 
-         !$acc parallel
+         !$acc parallel default(present)
          !$acc loop gang vector
          do iCell=1,nCells_acc
             meshScalingRegionalCell(iCell) = 1.0 / (meshDensity(iCell))**0.25
@@ -1282,7 +1282,7 @@ module atm_core
       vertexDegree_acc = vertexDegree
 
 
-      !$acc parallel
+      !$acc parallel default(present)
       !$acc loop gang worker
       do iVtx=1,nVertices_acc
          !$acc loop vector
@@ -1300,7 +1300,7 @@ module atm_core
       end do
       !$acc end parallel
 
-      !$acc parallel
+      !$acc parallel default(present)
       !$acc loop gang worker
       do iCell=1,nCells_acc
          !$acc loop vector
@@ -1324,7 +1324,7 @@ module atm_core
 
       kiteForCell_error = .false.
 
-      !$acc parallel
+      !$acc parallel default(present)
       !$acc loop gang worker reduction(.or.:kiteForCell_error)
       do iCell=1,nCells_acc
          !$acc loop vector reduction(.or.:kiteForCell_error)
@@ -1389,10 +1389,10 @@ module atm_core
       call mpas_pool_get_config(configs, 'config_zd', config_zd)
       call mpas_pool_get_config(configs, 'config_xnutr', config_xnutr)
 
-      !$acc kernels
+      !$acc kernels default(present)
       dss(:,:) = 0.0
       !$acc end kernels
-      !$acc parallel
+      !$acc parallel default(present)
       !$acc loop gang worker
       do iCell=1,nCells_acc
          zt = zgrid(nVertLevels_acc+1,iCell)
@@ -1527,7 +1527,7 @@ module atm_core
       nCells_acc = nCells
       nEdges_acc = nEdges
 
-      !$acc parallel
+      !$acc parallel default(present)
       !$acc loop gang vector private(cell_list)
       do iEdge = 1, nEdges_acc
          nAdvCellsForEdge(iEdge) = 0
@@ -1675,7 +1675,7 @@ module atm_core
 
       call mpas_pool_get_config(configs, 'config_coef_3rd_order', config_coef_3rd_order)
 
-      !$acc kernels
+      !$acc kernels default(present)
       adv_coefs_3rd(:,:) = config_coef_3rd_order * adv_coefs_3rd(:,:)
       zb3_cell(:,:,:) = config_coef_3rd_order * zb3_cell(:,:,:)
       !$acc end kernels
@@ -1814,7 +1814,7 @@ module atm_core
       call mpas_pool_get_array(mesh, 'zEdge', zEdge)
       call mpas_pool_get_array(mesh, 'angleEdge', angleEdge)
 
-      !$acc kernels
+      !$acc kernels default(present)
       deformation_coef_c2(:,:) = 0.
       deformation_coef_s2(:,:) = 0.
       deformation_coef_cs(:,:) = 0.
@@ -1824,7 +1824,7 @@ module atm_core
 
       pii = 2.*asin(1.0)
 
-      !$acc parallel
+      !$acc parallel default(present)
       !$acc loop gang vector &
       !$acc      private(xc, yc, zc, thetav, thetat, dl_sphere, xp, yp, cell_list)
       do iCell = 1, nCells
