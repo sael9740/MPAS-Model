@@ -177,14 +177,12 @@ module mpas_field_routines
            if(.not.associated(f_cursor % array)) then
              if ( threadNum == 0 ) then
                allocate(f_cursor % array(f_cursor % dimSizes(1)))
-#ifdef ACC_DEVICE_RESIDENT
                ! A scratch field is device-resident for as long as its host allocation
                ! lives, so it is created on the device here and deleted in the matching
-               ! mpas_deallocate_scratch_field. Without ACC_DEVICE_RESIDENT (the hybrid/
-               ! development model) this is skipped, and staging is left to the data
-               ! regions around whichever ported sections use the field.
+               ! mpas_deallocate_scratch_field. Under -gpu=mem:managed the runtime
+               ! satisfies this from the address range alone and makes no device copy,
+               ! so the directive is correct in either memory model.
                !$acc enter data create(f_cursor % array)
-#endif
              end if
            end if
            f_cursor => f_cursor % next
@@ -300,14 +298,12 @@ module mpas_field_routines
            if(.not.associated(f_cursor % array)) then
              if ( threadNum == 0 ) then
                allocate(f_cursor % array(f_cursor % dimSizes(1), f_cursor % dimSizes(2)))
-#ifdef ACC_DEVICE_RESIDENT
                ! A scratch field is device-resident for as long as its host allocation
                ! lives, so it is created on the device here and deleted in the matching
-               ! mpas_deallocate_scratch_field. Without ACC_DEVICE_RESIDENT (the hybrid/
-               ! development model) this is skipped, and staging is left to the data
-               ! regions around whichever ported sections use the field.
+               ! mpas_deallocate_scratch_field. Under -gpu=mem:managed the runtime
+               ! satisfies this from the address range alone and makes no device copy,
+               ! so the directive is correct in either memory model.
                !$acc enter data create(f_cursor % array)
-#endif
              end if
            end if
            f_cursor => f_cursor % next
@@ -429,14 +425,12 @@ module mpas_field_routines
            do while(associated(f_cursor))
              if(.not.associated(f_cursor % array)) then
                allocate(f_cursor % array(f_cursor % dimSizes(1), f_cursor % dimSizes(2), f_cursor % dimSizes(3)))
-#ifdef ACC_DEVICE_RESIDENT
                ! A scratch field is device-resident for as long as its host allocation
                ! lives, so it is created on the device here and deleted in the matching
-               ! mpas_deallocate_scratch_field. Without ACC_DEVICE_RESIDENT (the hybrid/
-               ! development model) this is skipped, and staging is left to the data
-               ! regions around whichever ported sections use the field.
+               ! mpas_deallocate_scratch_field. Under -gpu=mem:managed the runtime
+               ! satisfies this from the address range alone and makes no device copy,
+               ! so the directive is correct in either memory model.
                !$acc enter data create(f_cursor % array)
-#endif
              end if
              f_cursor => f_cursor % next
            end do
@@ -563,14 +557,12 @@ module mpas_field_routines
            do while(associated(f_cursor))
              if(.not.associated(f_cursor % array)) then
                allocate(f_cursor % array(f_cursor % dimSizes(1)))
-#ifdef ACC_DEVICE_RESIDENT
                ! A scratch field is device-resident for as long as its host allocation
                ! lives, so it is created on the device here and deleted in the matching
-               ! mpas_deallocate_scratch_field. Without ACC_DEVICE_RESIDENT (the hybrid/
-               ! development model) this is skipped, and staging is left to the data
-               ! regions around whichever ported sections use the field.
+               ! mpas_deallocate_scratch_field. Under -gpu=mem:managed the runtime
+               ! satisfies this from the address range alone and makes no device copy,
+               ! so the directive is correct in either memory model.
                !$acc enter data create(f_cursor % array)
-#endif
              end if
              f_cursor => f_cursor % next
            end do
@@ -686,14 +678,12 @@ module mpas_field_routines
            do while(associated(f_cursor))
              if(.not.associated(f_cursor % array)) then
                allocate(f_cursor % array(f_cursor % dimSizes(1), f_cursor % dimSizes(2)))
-#ifdef ACC_DEVICE_RESIDENT
                ! A scratch field is device-resident for as long as its host allocation
                ! lives, so it is created on the device here and deleted in the matching
-               ! mpas_deallocate_scratch_field. Without ACC_DEVICE_RESIDENT (the hybrid/
-               ! development model) this is skipped, and staging is left to the data
-               ! regions around whichever ported sections use the field.
+               ! mpas_deallocate_scratch_field. Under -gpu=mem:managed the runtime
+               ! satisfies this from the address range alone and makes no device copy,
+               ! so the directive is correct in either memory model.
                !$acc enter data create(f_cursor % array)
-#endif
              end if
              f_cursor => f_cursor % next
            end do
@@ -813,14 +803,12 @@ module mpas_field_routines
            do while(associated(f_cursor))
              if(.not.associated(f_cursor % array)) then
                allocate(f_cursor % array(f_cursor % dimSizes(1), f_cursor % dimSizes(2), f_cursor % dimSizes(3)))
-#ifdef ACC_DEVICE_RESIDENT
                ! A scratch field is device-resident for as long as its host allocation
                ! lives, so it is created on the device here and deleted in the matching
-               ! mpas_deallocate_scratch_field. Without ACC_DEVICE_RESIDENT (the hybrid/
-               ! development model) this is skipped, and staging is left to the data
-               ! regions around whichever ported sections use the field.
+               ! mpas_deallocate_scratch_field. Under -gpu=mem:managed the runtime
+               ! satisfies this from the address range alone and makes no device copy,
+               ! so the directive is correct in either memory model.
                !$acc enter data create(f_cursor % array)
-#endif
              end if
              f_cursor => f_cursor % next
            end do
@@ -946,14 +934,12 @@ module mpas_field_routines
            do while(associated(f_cursor))
              if(.not.associated(f_cursor % array)) then
                allocate(f_cursor % array(f_cursor % dimSizes(1), f_cursor % dimSizes(2), f_cursor % dimSizes(3), f_cursor % dimSizes(4)))
-#ifdef ACC_DEVICE_RESIDENT
                ! A scratch field is device-resident for as long as its host allocation
                ! lives, so it is created on the device here and deleted in the matching
-               ! mpas_deallocate_scratch_field. Without ACC_DEVICE_RESIDENT (the hybrid/
-               ! development model) this is skipped, and staging is left to the data
-               ! regions around whichever ported sections use the field.
+               ! mpas_deallocate_scratch_field. Under -gpu=mem:managed the runtime
+               ! satisfies this from the address range alone and makes no device copy,
+               ! so the directive is correct in either memory model.
                !$acc enter data create(f_cursor % array)
-#endif
              end if
              f_cursor => f_cursor % next
            end do
@@ -1086,14 +1072,12 @@ module mpas_field_routines
            do while(associated(f_cursor))
              if(.not.associated(f_cursor % array)) then
                allocate(f_cursor % array(f_cursor % dimSizes(1), f_cursor % dimSizes(2), f_cursor % dimSizes(3), f_cursor % dimSizes(4), f_cursor % dimSizes(5)))
-#ifdef ACC_DEVICE_RESIDENT
                ! A scratch field is device-resident for as long as its host allocation
                ! lives, so it is created on the device here and deleted in the matching
-               ! mpas_deallocate_scratch_field. Without ACC_DEVICE_RESIDENT (the hybrid/
-               ! development model) this is skipped, and staging is left to the data
-               ! regions around whichever ported sections use the field.
+               ! mpas_deallocate_scratch_field. Under -gpu=mem:managed the runtime
+               ! satisfies this from the address range alone and makes no device copy,
+               ! so the directive is correct in either memory model.
                !$acc enter data create(f_cursor % array)
-#endif
              end if
              f_cursor => f_cursor % next
            end do
@@ -1307,11 +1291,9 @@ module mpas_field_routines
              f_cursor => f
              do while(associated(f_cursor))
                if(associated(f_cursor % array)) then
-#ifdef ACC_DEVICE_RESIDENT
                  ! Matches the enter data create in mpas_allocate_scratch_field: the device
                  ! copy is removed before the host allocation it corresponds to goes away.
                  !$acc exit data delete(f_cursor % array)
-#endif
                  deallocate(f_cursor % array)
                end if
    
@@ -1362,11 +1344,9 @@ module mpas_field_routines
              f_cursor => f
              do while(associated(f_cursor))
                if(associated(f_cursor % array)) then
-#ifdef ACC_DEVICE_RESIDENT
                  ! Matches the enter data create in mpas_allocate_scratch_field: the device
                  ! copy is removed before the host allocation it corresponds to goes away.
                  !$acc exit data delete(f_cursor % array)
-#endif
                  deallocate(f_cursor % array)
                end if
    
@@ -1417,11 +1397,9 @@ module mpas_field_routines
              f_cursor => f
              do while(associated(f_cursor))
                if(associated(f_cursor % array)) then
-#ifdef ACC_DEVICE_RESIDENT
                  ! Matches the enter data create in mpas_allocate_scratch_field: the device
                  ! copy is removed before the host allocation it corresponds to goes away.
                  !$acc exit data delete(f_cursor % array)
-#endif
                  deallocate(f_cursor % array)
                end if
    
@@ -1472,11 +1450,9 @@ module mpas_field_routines
              f_cursor => f
              do while(associated(f_cursor))
                if(associated(f_cursor % array)) then
-#ifdef ACC_DEVICE_RESIDENT
                  ! Matches the enter data create in mpas_allocate_scratch_field: the device
                  ! copy is removed before the host allocation it corresponds to goes away.
                  !$acc exit data delete(f_cursor % array)
-#endif
                  deallocate(f_cursor % array)
                end if
    
@@ -1527,11 +1503,9 @@ module mpas_field_routines
              f_cursor => f
              do while(associated(f_cursor))
                if(associated(f_cursor % array)) then
-#ifdef ACC_DEVICE_RESIDENT
                  ! Matches the enter data create in mpas_allocate_scratch_field: the device
                  ! copy is removed before the host allocation it corresponds to goes away.
                  !$acc exit data delete(f_cursor % array)
-#endif
                  deallocate(f_cursor % array)
                end if
    
@@ -1582,11 +1556,9 @@ module mpas_field_routines
              f_cursor => f
              do while(associated(f_cursor))
                if(associated(f_cursor % array)) then
-#ifdef ACC_DEVICE_RESIDENT
                  ! Matches the enter data create in mpas_allocate_scratch_field: the device
                  ! copy is removed before the host allocation it corresponds to goes away.
                  !$acc exit data delete(f_cursor % array)
-#endif
                  deallocate(f_cursor % array)
                end if
    
@@ -1637,11 +1609,9 @@ module mpas_field_routines
              f_cursor => f
              do while(associated(f_cursor))
                if(associated(f_cursor % array)) then
-#ifdef ACC_DEVICE_RESIDENT
                  ! Matches the enter data create in mpas_allocate_scratch_field: the device
                  ! copy is removed before the host allocation it corresponds to goes away.
                  !$acc exit data delete(f_cursor % array)
-#endif
                  deallocate(f_cursor % array)
                end if
    
@@ -1692,11 +1662,9 @@ module mpas_field_routines
              f_cursor => f
              do while(associated(f_cursor))
                if(associated(f_cursor % array)) then
-#ifdef ACC_DEVICE_RESIDENT
                  ! Matches the enter data create in mpas_allocate_scratch_field: the device
                  ! copy is removed before the host allocation it corresponds to goes away.
                  !$acc exit data delete(f_cursor % array)
-#endif
                  deallocate(f_cursor % array)
                end if
    
@@ -2403,13 +2371,11 @@ module mpas_field_routines
                f_next => f_cursor % next
 
                if (associated(f_cursor % array)) then
-#ifdef ACC_DEVICE_RESIDENT
                    ! Matches the enter data create that made this array resident at
                    ! allocation (mpas_block_creator_allocate_pool_fields for persistent
                    ! pool fields, mpas_allocate_scratch_field for scratch ones): release
                    ! the device copy immediately before the host allocation goes away.
                    !$acc exit data delete(f_cursor % array)
-#endif
                    deallocate(f_cursor % array)
                end if
 
@@ -2460,13 +2426,11 @@ module mpas_field_routines
                f_next => f_cursor % next
 
                if (associated(f_cursor % array)) then
-#ifdef ACC_DEVICE_RESIDENT
                    ! Matches the enter data create that made this array resident at
                    ! allocation (mpas_block_creator_allocate_pool_fields for persistent
                    ! pool fields, mpas_allocate_scratch_field for scratch ones): release
                    ! the device copy immediately before the host allocation goes away.
                    !$acc exit data delete(f_cursor % array)
-#endif
                    deallocate(f_cursor % array)
                end if
 
@@ -2517,13 +2481,11 @@ module mpas_field_routines
                f_next => f_cursor % next
 
                if (associated(f_cursor % array)) then
-#ifdef ACC_DEVICE_RESIDENT
                    ! Matches the enter data create that made this array resident at
                    ! allocation (mpas_block_creator_allocate_pool_fields for persistent
                    ! pool fields, mpas_allocate_scratch_field for scratch ones): release
                    ! the device copy immediately before the host allocation goes away.
                    !$acc exit data delete(f_cursor % array)
-#endif
                    deallocate(f_cursor % array)
                end if
 
@@ -2620,13 +2582,11 @@ module mpas_field_routines
                f_next => f_cursor % next
 
                if (associated(f_cursor % array)) then
-#ifdef ACC_DEVICE_RESIDENT
                    ! Matches the enter data create that made this array resident at
                    ! allocation (mpas_block_creator_allocate_pool_fields for persistent
                    ! pool fields, mpas_allocate_scratch_field for scratch ones): release
                    ! the device copy immediately before the host allocation goes away.
                    !$acc exit data delete(f_cursor % array)
-#endif
                    deallocate(f_cursor % array)
                end if
 
@@ -2677,13 +2637,11 @@ module mpas_field_routines
                f_next => f_cursor % next
 
                if (associated(f_cursor % array)) then
-#ifdef ACC_DEVICE_RESIDENT
                    ! Matches the enter data create that made this array resident at
                    ! allocation (mpas_block_creator_allocate_pool_fields for persistent
                    ! pool fields, mpas_allocate_scratch_field for scratch ones): release
                    ! the device copy immediately before the host allocation goes away.
                    !$acc exit data delete(f_cursor % array)
-#endif
                    deallocate(f_cursor % array)
                end if
 
@@ -2734,13 +2692,11 @@ module mpas_field_routines
                f_next => f_cursor % next
 
                if (associated(f_cursor % array)) then
-#ifdef ACC_DEVICE_RESIDENT
                    ! Matches the enter data create that made this array resident at
                    ! allocation (mpas_block_creator_allocate_pool_fields for persistent
                    ! pool fields, mpas_allocate_scratch_field for scratch ones): release
                    ! the device copy immediately before the host allocation goes away.
                    !$acc exit data delete(f_cursor % array)
-#endif
                    deallocate(f_cursor % array)
                end if
 
@@ -2791,13 +2747,11 @@ module mpas_field_routines
                f_next => f_cursor % next
 
                if (associated(f_cursor % array)) then
-#ifdef ACC_DEVICE_RESIDENT
                    ! Matches the enter data create that made this array resident at
                    ! allocation (mpas_block_creator_allocate_pool_fields for persistent
                    ! pool fields, mpas_allocate_scratch_field for scratch ones): release
                    ! the device copy immediately before the host allocation goes away.
                    !$acc exit data delete(f_cursor % array)
-#endif
                    deallocate(f_cursor % array)
                end if
 
@@ -2848,13 +2802,11 @@ module mpas_field_routines
                f_next => f_cursor % next
 
                if (associated(f_cursor % array)) then
-#ifdef ACC_DEVICE_RESIDENT
                    ! Matches the enter data create that made this array resident at
                    ! allocation (mpas_block_creator_allocate_pool_fields for persistent
                    ! pool fields, mpas_allocate_scratch_field for scratch ones): release
                    ! the device copy immediately before the host allocation goes away.
                    !$acc exit data delete(f_cursor % array)
-#endif
                    deallocate(f_cursor % array)
                end if
 

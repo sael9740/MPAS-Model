@@ -1672,9 +1672,7 @@ module mpas_block_creator
                               ierr = 1
                               return
                            end if
-#ifdef ACC_DEVICE_RESIDENT
                            !$acc enter data create(real1DField % array)
-#endif
                            allocated_bytes = allocated_bytes + field_bytes
                            REPORT_TOTAL_ALLOCATION(allocated_bytes)
 #ifdef MPAS_OPENACC
@@ -1719,9 +1717,7 @@ module mpas_block_creator
                               ierr = 1
                               return
                            end if
-#ifdef ACC_DEVICE_RESIDENT
                            !$acc enter data create(real2DField % array)
-#endif
                            allocated_bytes = allocated_bytes + field_bytes
                            REPORT_TOTAL_ALLOCATION(allocated_bytes)
 #ifdef MPAS_OPENACC
@@ -1768,9 +1764,7 @@ module mpas_block_creator
                               ierr = 1
                               return
                            end if
-#ifdef ACC_DEVICE_RESIDENT
                            !$acc enter data create(real3DField % array)
-#endif
                            allocated_bytes = allocated_bytes + field_bytes
                            REPORT_TOTAL_ALLOCATION(allocated_bytes)
 #ifdef MPAS_OPENACC
@@ -1819,9 +1813,7 @@ module mpas_block_creator
                               ierr = 1
                               return
                            end if
-#ifdef ACC_DEVICE_RESIDENT
                            !$acc enter data create(real4DField % array)
-#endif
                            allocated_bytes = allocated_bytes + field_bytes
                            REPORT_TOTAL_ALLOCATION(allocated_bytes)
 #ifdef MPAS_OPENACC
@@ -1871,9 +1863,7 @@ module mpas_block_creator
                               ierr = 1
                               return
                            end if
-#ifdef ACC_DEVICE_RESIDENT
                            !$acc enter data create(real5DField % array)
-#endif
                            allocated_bytes = allocated_bytes + field_bytes
                            REPORT_TOTAL_ALLOCATION(allocated_bytes)
 #ifdef MPAS_OPENACC
@@ -1918,9 +1908,7 @@ module mpas_block_creator
                               ierr = 1
                               return
                            end if
-#ifdef ACC_DEVICE_RESIDENT
                            !$acc enter data create(int1DField % array)
-#endif
                            allocated_bytes = allocated_bytes + field_bytes
                            REPORT_TOTAL_ALLOCATION(allocated_bytes)
 #ifdef MPAS_OPENACC
@@ -1965,9 +1953,7 @@ module mpas_block_creator
                               ierr = 1
                               return
                            end if
-#ifdef ACC_DEVICE_RESIDENT
                            !$acc enter data create(int2DField % array)
-#endif
                            allocated_bytes = allocated_bytes + field_bytes
                            REPORT_TOTAL_ALLOCATION(allocated_bytes)
 #ifdef MPAS_OPENACC
@@ -2014,9 +2000,7 @@ module mpas_block_creator
                               ierr = 1
                               return
                            end if
-#ifdef ACC_DEVICE_RESIDENT
                            !$acc enter data create(int3DField % array)
-#endif
                            allocated_bytes = allocated_bytes + field_bytes
                            REPORT_TOTAL_ALLOCATION(allocated_bytes)
 #ifdef MPAS_OPENACC
