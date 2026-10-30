@@ -7,23 +7,23 @@ endif
 # GPU_MEM_MODE=<separate|managed|unified>[:suboption[:suboption...]] appends a
 # "mem:..." suboption to the nvhpc build target's -gpu= flag, selecting the
 # OpenACC memory model (and any nvhpc mem suboptions, e.g. unified:managedalloc).
-# If unset it follows ACC_DEVICE_RESIDENT, since the two models want opposite
-# defaults: the GPU-resident model owns its device copies explicitly and wants
-# them in separate memory, while the hybrid model leans on the compiler's
-# implicit data regions and is simplest when host and device share an address
-# space. ACC_DEVICE_RESIDENT itself defaults to the hybrid model, so an
-# unqualified build gets mem:managed, which provides that shared space on any
-# CUDA-capable GPU. mem:unified also needs system-wide address translation from
-# the hardware and driver, which makes it the better mode where it is available
-# but a poor default. An explicit GPU_MEM_MODE= on the make command line
-# overrides this.
-ifeq "$(GPU_MEM_MODE)" ""
-ifeq "$(ACC_DEVICE_RESIDENT)" "true"
-        GPU_MEM_MODE = separate
-else
-        GPU_MEM_MODE = managed
-endif
-endif
+# It is the ONLY thing that distinguishes the two data models now: the source is
+# identical either way, every !$acc parallel carries default(present), and the
+# framework's residency directives are always compiled.
+#
+#   managed   host and device share an address space on any CUDA-capable GPU.
+#             The runtime satisfies a present lookup on heap data from the
+#             address alone, so default(present) enforces nothing and code that
+#             was never made resident still works. This is the default.
+#   separate  discrete device memory. default(present) is a real check here, and
+#             this is the only configuration in which it reports a field that is
+#             not resident. Build it in CI for that reason.
+#   unified   also needs system-wide address translation from the hardware and
+#             driver; better where available, but it aborts at the first compute
+#             construct on hardware without it, so it is a poor default.
+#
+# An explicit GPU_MEM_MODE= on the make command line overrides this.
+GPU_MEM_MODE ?= managed
 ACC_MEM_MODE = ,mem:$(GPU_MEM_MODE)
 
 dummy:
@@ -190,7 +190,6 @@ nvhpc:   # BUILDTARGET NVIDIA HPC SDK
 	"USE_PAPI = $(USE_PAPI)" \
 	"OPENMP = $(OPENMP)" \
 	"OPENACC = $(OPENACC)" \
-	"ACC_DEVICE_RESIDENT = $(ACC_DEVICE_RESIDENT)" \
 	"MPAS_NVTX = $(MPAS_NVTX)" \
 	"GPU_MEM_MODE = $(GPU_MEM_MODE)" \
 	"NVHPC_BFB = $(NVHPC_BFB)" \
@@ -904,30 +903,6 @@ ifeq "$(OPENACC)" "true"
         override CPPFLAGS += "-DMPAS_OPENACC"
         LDFLAGS += $(FFLAGS_ACC)
 
-# ACC_DEVICE_RESIDENT selects the GPU-resident data-lifetime model: fields that
-# are used on the device stay resident for the lifetime of their host-side
-# allocation, rather than being staged in and out around each use. Code guarded
-# by this macro is what makes a field device-resident in the first place, so a
-# build without it falls back to the hybrid/development model, where data
-# regions around each ported section perform real transfers and unported host
-# code still sees correct values. That hybrid model is the default: only an
-# explicit ACC_DEVICE_RESIDENT=true selects residency, because the port is not
-# complete and the hybrid model is the one that is correct for unported code.
-# Only meaningful with OPENACC=true.
-#
-# ACC_DEFAULT_ARG is the default data clause placed on every !$acc parallel
-# construct. In the GPU-resident model it expands to default(present), so a field
-# that was never made resident becomes an immediate, named runtime error rather
-# than a silent copy of stale host data. In the hybrid/development model it
-# expands to nothing, letting the compiler generate an implicit data region per
-# construct so that unported host code still sees correct values.
-ifeq "$(ACC_DEVICE_RESIDENT)" "true"
-        override CPPFLAGS += "-DACC_DEVICE_RESIDENT"
-        override CPPFLAGS += '-DACC_DEFAULT_ARG=default(present)'
-else
-        override CPPFLAGS += '-DACC_DEFAULT_ARG='
-endif #ACC_DEVICE_RESIDENT IF
-
 # ACC_CAPTURE_ARG is the capture data-clause modifier, which gives a variable a
 # discrete device allocation even where host and device share memory. Compiler
 # support for it on unstructured data clauses varies, so it is injected only for
@@ -1100,13 +1075,9 @@ else
 endif
 
 ifeq "$(OPENACC)" "true"
-ifeq "$(ACC_DEVICE_RESIDENT)" "true"
-	ACC_DEVICE_RESIDENT_MESSAGE="MPAS was built with the GPU-resident OpenACC data model."
+	ACC_MEM_MODE_MESSAGE="MPAS was built with OpenACC memory model mem:$(GPU_MEM_MODE)."
 else
-	ACC_DEVICE_RESIDENT_MESSAGE="MPAS was built with the hybrid/development OpenACC data model."
-endif
-else
-	ACC_DEVICE_RESIDENT_MESSAGE="MPAS was built without OpenACC data-residency options."
+	ACC_MEM_MODE_MESSAGE="MPAS was built without OpenACC."
 endif
 
 ifeq "$(NVHPC_BFB)" "true"
@@ -1688,7 +1659,7 @@ mpas_main: $(MAIN_DEPS)
 	@echo $(OPENMP_MESSAGE)
 	@echo $(OPENMP_OFFLOAD_MESSAGE)
 	@echo $(OPENACC_MESSAGE)
-	@echo $(ACC_DEVICE_RESIDENT_MESSAGE)
+	@echo $(ACC_MEM_MODE_MESSAGE)
 	@echo $(NVTX_MESSAGE)
 	@echo $(NVHPC_BFB_MESSAGE)
 	@echo $(MUSICA_MESSAGE)
@@ -1755,9 +1726,8 @@ errmsg:
 	@echo "                    TIMER_LIB=tau - Uses TAU for the timer interface instead of the native interface"
 	@echo "    OPENMP=true   - builds and links with OpenMP flags. Default is to not use OpenMP."
 	@echo "    OPENACC=true  - builds and links with OpenACC flags. Default is to not use OpenACC."
-	@echo "    ACC_DEVICE_RESIDENT=true - builds the GPU-resident OpenACC data model, where device-used fields stay resident for the lifetime of their host-side allocation (requires OPENACC=true). Default is the hybrid/development data model, where data regions around each ported section perform real host/device transfers so that unported host code still sees correct values."
 	@echo "    MPAS_NVTX=true - instruments all MPAS timers with NVTX profiling regions (requires nvhpc). Default is to not use NVTX."
-	@echo "    GPU_MEM_MODE=<separate|managed|unified>[:suboption[:suboption...]] - selects the OpenACC GPU memory model via -gpu=mem:<...> (requires nvhpc), e.g. GPU_MEM_MODE=unified:managedalloc maps to -gpu=mem:unified:managedalloc. Default follows ACC_DEVICE_RESIDENT: separate for the GPU-resident model, managed for the hybrid model."
+	@echo "    GPU_MEM_MODE=<separate|managed|unified>[:suboption[:suboption...]] - selects the OpenACC GPU memory model via -gpu=mem:<...> (requires nvhpc), e.g. GPU_MEM_MODE=unified:managedalloc maps to -gpu=mem:unified:managedalloc. Default managed. The source is identical in every mode; this flag alone decides whether default(present) is enforced (separate) or satisfied from the address range (managed)."
 	@echo "    NVHPC_BFB=true - adds -Mnofma (CPU/GPU) and -gpu=math_uniform (GPU) so nvhpc GPU builds are bit-for-bit reproducible against nvhpc CPU builds (requires nvhpc). Default is off."
 	@echo "    PRECISION=double - builds with default double-precision real kind. Default is to use single-precision."
 	@echo "    SHAREDLIB=true - generate position-independent code suitable for use in a shared library. Default is false."
