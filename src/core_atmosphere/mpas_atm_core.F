@@ -1834,7 +1834,13 @@ module atm_core
 
       pii = 2.*asin(1.0)
 
-      !$acc parallel default(present)
+      ! theta_abs is a local automatic array, not a pool field, so nothing ever
+      ! makes it resident and default(present) cannot be satisfied for it. It is
+      ! written and read only inside this construct, indexed by the loop variable
+      ! and never touched on the host, so it is a pure device temporary: create it
+      ! here rather than letting an implicit region copy it in and out. The other
+      ! locals are covered by the private clause below.
+      !$acc parallel default(present) create(theta_abs)
       !$acc loop gang vector &
       !$acc      private(xc, yc, zc, thetav, thetat, dl_sphere, xp, yp, cell_list)
       do iCell = 1, nCells
