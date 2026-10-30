@@ -150,7 +150,7 @@ contains
       !$acc enter data create(dudx, dudy, dvdx, dvdy)
       !$acc enter data create(d_11, d_22, d_12)
 
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
 
       !$acc loop gang worker private(dudx, dudy, dvdx, dvdy, d_11, d_22, d_12)
       do iCell = cellStart,cellEnd
@@ -274,7 +274,7 @@ contains
       h_mom_eddy_visc4   = config_visc4_2dsmag * config_len_disp**3
       h_theta_eddy_visc4 = h_mom_eddy_visc4
 
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
 
       !$acc loop gang worker private(dudx, dudy, dvdx, dvdy, dwdx, dwdy, dudz, dvdz, dwdz, d_11, d_22, d_33, d_12, d_13, d_23)
       do iCell = cellStart,cellEnd
@@ -502,7 +502,7 @@ contains
 
       !$acc enter data create(theta, temp, qvsw, coefa)
 
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
 
       !$acc loop gang worker private(theta, temp, qvsw, coefa)
       do iCell = cellStart,cellEnd
@@ -681,7 +681,7 @@ contains
       !$acc enter data create(u_mix)
       !$acc enter data create(turb_vflux)
 
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
 
       tau_12_factor = 0.0
       if(les_model_opt /= LES_MODEL_NONE) tau_12_factor = 1.0
@@ -729,7 +729,7 @@ contains
 
 !$OMP BARRIER
 
-         !$acc parallel ACC_DEFAULT_ARG
+         !$acc parallel default(present)
 
          !$acc loop gang worker
          do iVertex=vertexStart,vertexEnd
@@ -775,7 +775,7 @@ contains
 
 !$OMP BARRIER
 
-         !$acc parallel ACC_DEFAULT_ARG
+         !$acc parallel default(present)
 
          !$acc loop gang worker
          do iEdge=edgeSolveStart,edgeSolveEnd
@@ -817,7 +817,7 @@ contains
 
          if (config_mix_full) then  ! mix full state
 
-            !$acc parallel ACC_DEFAULT_ARG
+            !$acc parallel default(present)
 
             !$acc loop gang worker
             do iEdge=edgeSolveStart,edgeSolveEnd
@@ -847,7 +847,7 @@ contains
 
          else  ! idealized cases where we mix on the perturbation from the initial 1-D state
 
-            !$acc parallel ACC_DEFAULT_ARG
+            !$acc parallel default(present)
 
             !$acc loop gang worker private(u_mix)
             do iEdge=edgeSolveStart,edgeSolveEnd
@@ -887,7 +887,7 @@ contains
 
       if ( les_model_opt /= LES_MODEL_NONE ) then
 
-         !$acc parallel ACC_DEFAULT_ARG
+         !$acc parallel default(present)
 
          !$acc loop gang worker private(turb_vflux)
          do iEdge=edgeSolveStart,edgeSolveEnd
@@ -1026,7 +1026,7 @@ contains
 
       !$acc enter data create(turb_vflux)
 
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
 
       !$acc loop gang worker
       do iCell=cellStart,cellEnd
@@ -1072,7 +1072,7 @@ contains
 
       if (h_mom_eddy_visc4 > 0.0) then  ! 4th order mixing is active
 
-         !$acc parallel ACC_DEFAULT_ARG
+         !$acc parallel default(present)
 
          !$acc loop gang worker
          do iCell=cellSolveStart,cellSolveEnd    ! Technically updating fewer cells than before...
@@ -1101,7 +1101,7 @@ contains
 
       if ( v_mom_eddy_visc2 > 0.0 ) then  ! vertical mixing
 
-         !$acc parallel ACC_DEFAULT_ARG
+         !$acc parallel default(present)
 
          !$acc loop gang worker
          do iCell=cellSolveStart,cellSolveEnd
@@ -1120,7 +1120,7 @@ contains
 
       if ( les_model_opt /= LES_MODEL_NONE ) then
 
-         !$acc parallel ACC_DEFAULT_ARG
+         !$acc parallel default(present)
 
          !$acc loop gang worker private(turb_vflux)
          do iCell = cellSolveStart,cellSolveEnd ! vertical mixing for each column
@@ -1262,7 +1262,7 @@ contains
       !$acc enter data create(turb_vflux_scalars)
       !$acc enter data create(turb_vflux, prandtl_1d_inverse)
 
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
 
       !$acc loop gang worker
       do iCell=cellStart,cellEnd
@@ -1305,7 +1305,7 @@ contains
 
       if (h_theta_eddy_visc4 > 0.0) then  ! 4th order mixing is active
 
-         !$acc parallel ACC_DEFAULT_ARG
+         !$acc parallel default(present)
 
          !$acc loop gang worker
          do iCell=cellSolveStart,cellSolveEnd    ! Technically updating fewer cells than before...
@@ -1335,7 +1335,7 @@ contains
 
          do iScalar=1,num_scalars
 
-            !$acc parallel ACC_DEFAULT_ARG
+            !$acc parallel default(present)
 
             !$acc loop gang worker
             do iCell=cellStart,cellEnd
@@ -1377,7 +1377,7 @@ contains
 
             if (h_theta_eddy_visc4 > 0.0) then  ! 4th order mixing is active
 
-               !$acc parallel ACC_DEFAULT_ARG
+               !$acc parallel default(present)
 
                !$acc loop gang worker
                do iCell=cellSolveStart,cellSolveEnd    ! Technically updating fewer cells than before...
@@ -1415,7 +1415,7 @@ contains
 
          if (config_mix_full) then
 
-            !$acc parallel ACC_DEFAULT_ARG
+            !$acc parallel default(present)
 
             !$acc loop gang worker
             do iCell = cellSolveStart,cellSolveEnd
@@ -1441,7 +1441,7 @@ contains
 
          else  ! idealized cases where we mix on the perturbation from the initial 1-D state
 
-            !$acc parallel ACC_DEFAULT_ARG
+            !$acc parallel default(present)
 
             !$acc loop gang worker
             do iCell = cellSolveStart,cellSolveEnd
@@ -1471,7 +1471,7 @@ contains
 
       if ( les_model_opt /= LES_MODEL_NONE ) then
 
-         !$acc parallel ACC_DEFAULT_ARG
+         !$acc parallel default(present)
 
          !$acc loop gang worker private(turb_vflux, turb_vflux_scalars, prandtl_1d_inverse, rho_k_at_w, zz_at_w)
          do iCell = cellSolveStart,cellSolveEnd ! vertical mixing for each column

@@ -211,7 +211,7 @@ module mpas_field_routines
            arr => f_cursor % array
            defaultVal = f_cursor % defaultValue
            d1 = f_cursor % dimSizes(1)
-           !$acc parallel loop gang vector ACC_DEFAULT_ARG
+           !$acc parallel loop gang vector default(present)
            do i = 1, d1
              arr(i) = defaultVal
            end do
@@ -335,7 +335,7 @@ module mpas_field_routines
            defaultVal = f_cursor % defaultValue
            d1 = f_cursor % dimSizes(1)
            d2 = f_cursor % dimSizes(2)
-           !$acc parallel loop gang vector collapse(2) ACC_DEFAULT_ARG
+           !$acc parallel loop gang vector collapse(2) default(present)
            do i = 1, d2
              do j = 1, d1
                arr(j, i) = defaultVal
@@ -464,7 +464,7 @@ module mpas_field_routines
            d1 = f_cursor % dimSizes(1)
            d2 = f_cursor % dimSizes(2)
            d3 = f_cursor % dimSizes(3)
-           !$acc parallel loop gang vector collapse(3) ACC_DEFAULT_ARG
+           !$acc parallel loop gang vector collapse(3) default(present)
            do i = 1, d3
              do j = 1, d2
                do k = 1, d1
@@ -597,7 +597,7 @@ module mpas_field_routines
            arr => f_cursor % array
            defaultVal = f_cursor % defaultValue
            d1 = f_cursor % dimSizes(1)
-           !$acc parallel loop gang vector ACC_DEFAULT_ARG
+           !$acc parallel loop gang vector default(present)
            do i = 1, d1
              arr(i) = defaultVal
            end do
@@ -721,7 +721,7 @@ module mpas_field_routines
            defaultVal = f_cursor % defaultValue
            d1 = f_cursor % dimSizes(1)
            d2 = f_cursor % dimSizes(2)
-           !$acc parallel loop gang vector collapse(2) ACC_DEFAULT_ARG
+           !$acc parallel loop gang vector collapse(2) default(present)
            do i = 1, d2
              do j = 1, d1
                arr(j, i) = defaultVal
@@ -848,7 +848,7 @@ module mpas_field_routines
            d1 = f_cursor % dimSizes(1)
            d2 = f_cursor % dimSizes(2)
            d3 = f_cursor % dimSizes(3)
-           !$acc parallel loop gang vector collapse(3) ACC_DEFAULT_ARG
+           !$acc parallel loop gang vector collapse(3) default(present)
            do i = 1, d3
              do j = 1, d2
                do k = 1, d1
@@ -982,7 +982,7 @@ module mpas_field_routines
            d2 = f_cursor % dimSizes(2)
            d3 = f_cursor % dimSizes(3)
            d4 = f_cursor % dimSizes(4)
-           !$acc parallel loop gang vector collapse(4) ACC_DEFAULT_ARG
+           !$acc parallel loop gang vector collapse(4) default(present)
            do i = 1, d4
              do j = 1, d3
                do k = 1, d2
@@ -1123,7 +1123,7 @@ module mpas_field_routines
            d3 = f_cursor % dimSizes(3)
            d4 = f_cursor % dimSizes(4)
            d5 = f_cursor % dimSizes(5)
-           !$acc parallel loop gang vector collapse(5) ACC_DEFAULT_ARG
+           !$acc parallel loop gang vector collapse(5) default(present)
            do i = 1, d5
              do j = 1, d4
                do k = 1, d3

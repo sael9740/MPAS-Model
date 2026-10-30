@@ -563,7 +563,7 @@ module atm_time_integration
       ! allocate storage for physics tendency save
       !
       allocate(qtot(nVertLevels,nCells+1))
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop vector
       do k = 1, nVertLevels
          qtot(k,nCells+1) = 0.0_RKIND
@@ -584,7 +584,7 @@ module atm_time_integration
       call mpas_pool_get_array(tend_physics, 'tend_rtheta_physics', tend_rtheta_physics)
       call mpas_pool_get_array(tend_physics, 'tend_rho_physics', tend_rho_physics)
       call mpas_pool_get_array(tend_physics, 'tend_ru_physics', tend_ru_physics)
-      !$acc kernels ACC_DEFAULT_ARG
+      !$acc kernels default(present)
       tend_rtheta_physics(:,nCells+1) = 0.0_RKIND
       tend_rho_physics(:,nCells+1) = 0.0_RKIND
       tend_ru_physics(:,nEdges+1) = 0.0_RKIND
@@ -779,7 +779,7 @@ module atm_time_integration
             allocate(delsq_vorticity(nVertLevels,nVertices+1))
             allocate(dpdz(nVertLevels,nCells+1))
 
-            !$acc parallel ACC_DEFAULT_ARG
+            !$acc parallel default(present)
             !$acc loop vector
             do k = 1, nVertLevels
                delsq_theta(k,nCells+1) = 0.0_RKIND
@@ -991,7 +991,7 @@ module atm_time_integration
                call mpas_atm_get_bdy_state(clock, block, nVertLevels, nEdges, 'u', time_dyn_step, ru_driving_values)
 
                ! do this inline at present - it is simple enough
-               !$acc parallel ACC_DEFAULT_ARG
+               !$acc parallel default(present)
                !$acc loop gang worker
                do iEdge = 1, nEdgesSolve
                   if(bdyMaskEdge(iEdge) > nRelaxZone) then
@@ -1006,7 +1006,7 @@ module atm_time_integration
                call mpas_atm_get_bdy_state(clock, block, nVertLevels, nEdges, 'ru', time_dyn_step, ru_driving_values)
                call mpas_pool_get_array(diag, 'ru', u)
                ! do this inline at present - it is simple enough
-               !$acc parallel ACC_DEFAULT_ARG
+               !$acc parallel default(present)
                !$acc loop gang worker
                do iEdge = 1, nEdges
                   if(bdyMaskEdge(iEdge) > nRelaxZone) then
@@ -1077,7 +1077,7 @@ module atm_time_integration
             allocate(ke_vertex(nVertLevels,nVertices+1))
             allocate(ke_edge(nVertLevels,nEdges+1))
 
-            !$acc parallel ACC_DEFAULT_ARG
+            !$acc parallel default(present)
             !$acc loop vector
             do k = 1, nVertLevels
                ke_vertex(k,nVertices+1) = 0.0_RKIND
@@ -1309,7 +1309,7 @@ module atm_time_integration
       end if
 
       !simply set to zero negative mixing ratios of different water species (for now):
-      !$acc kernels ACC_DEFAULT_ARG
+      !$acc kernels default(present)
       where ( scalars_2(:,:,:) < 0.0)  &
          scalars_2(:,:,:) = 0.0
       !$acc end kernels
@@ -1496,7 +1496,7 @@ module atm_time_integration
       allocate(s_max_arr(nVertLevels,nCells+1))
       allocate(s_min_arr(nVertLevels,nCells+1))
       allocate(flux_array(nVertLevels,nEdges+1))
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop vector
       do k = 1, nVertLevels
          scalar_old_arr(k,nCells+1) = 0.0_RKIND
@@ -1508,7 +1508,7 @@ module atm_time_integration
       !$acc end parallel
 
       allocate(wdtn_arr(nVertLevels+1,nCells+1))
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop vector
       do k = 1, nVertLevels+1
          wdtn_arr(k,nCells+1) = 0.0_RKIND
@@ -1517,7 +1517,7 @@ module atm_time_integration
 
       if (config_split_dynamics_transport) then
          allocate(rho_zz_int(nVertLevels,nCells+1))
-         !$acc kernels ACC_DEFAULT_ARG
+         !$acc kernels default(present)
          rho_zz_int(:,nCells+1) = 0.0_RKIND
          !$acc end kernels
       else
@@ -1525,7 +1525,7 @@ module atm_time_integration
       end if
       if (rk_step < 3 .or. (.not. config_monotonic .and. .not. config_positive_definite)) then
          allocate(horiz_flux_array(num_scalars,nVertLevels,nEdges+1))
-         !$acc parallel ACC_DEFAULT_ARG
+         !$acc parallel default(present)
          !$acc loop gang vector collapse(2)
          do k = 1, nVertLevels
             do iScalar = 1, num_scalars
@@ -1536,7 +1536,7 @@ module atm_time_integration
       else
          allocate(flux_upwind_tmp_arr(nVertLevels,nEdges+1))
          allocate(flux_tmp_arr(nVertLevels,nEdges+1))
-         !$acc parallel ACC_DEFAULT_ARG
+         !$acc parallel default(present)
          !$acc loop vector
          do k = 1, nVertLevels
             flux_upwind_tmp_arr(k,nEdges+1) = 0.0_RKIND
@@ -1650,7 +1650,7 @@ module atm_time_integration
       theta_m_2(:,cellEnd+1) = 0.0_RKIND
       !$acc end kernels
 
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop gang worker
       do iEdge = edgeStart,edgeEnd
          !$acc loop vector
@@ -1742,7 +1742,7 @@ module atm_time_integration
       moist_start = moist_start_ptr
       moist_end = moist_end_ptr
 
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop gang worker
 !      do iCell = cellSolveStart,cellSolveEnd
       do iCell = cellStart,cellEnd
@@ -1758,7 +1758,7 @@ module atm_time_integration
       !$acc end parallel
 
 !      do iCell = cellSolveStart,cellSolveEnd
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop gang worker
       do iCell = cellStart,cellEnd
         !$acc loop vector
@@ -1771,7 +1771,7 @@ module atm_time_integration
 
 !  would need to compute qtot for all cells and an openmp barrier to use qtot below.
 
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop gang worker
       do iEdge = edgeStart,edgeEnd
          cell1 = cellsOnEdge(1,iEdge)
@@ -1933,7 +1933,7 @@ module atm_time_integration
       rcv = rgas/(cp-rgas)
       c2 = cp*rcv
 
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop gang worker
 ! MGD bad to have all threads setting this variable?
       do k=1,nVertLevels
@@ -1941,7 +1941,7 @@ module atm_time_integration
       end do
       !$acc end parallel
 
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop gang worker private(b_tri,c_tri)
       do iCell = cellSolveStart,cellSolveEnd  !  we only need to do cells we are solving for, not halo cells
 
@@ -2124,7 +2124,7 @@ module atm_time_integration
       ! here we need to compute the omega tendency in a manner consistent with our diagnosis of omega.
       ! this requires us to use the same flux divergence as is used in the theta eqn - see Klemp et al MWR 2003.
 
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop gang worker
       do iCell=cellSolveStart,cellSolveEnd
 
@@ -2401,7 +2401,7 @@ module atm_time_integration
 
         !MGD this loop will not be very load balanced with if-test below
 
-        !$acc parallel ACC_DEFAULT_ARG
+        !$acc parallel default(present)
         !$acc loop gang worker
         do iEdge=edgeStart,edgeEnd ! MGD do we really just need edges touching owned cells?
 
@@ -2434,7 +2434,7 @@ module atm_time_integration
 
       else !  this is all that us needed for ru_p update for first acoustic step in RK substep
 
-        !$acc parallel ACC_DEFAULT_ARG
+        !$acc parallel default(present)
         !$acc loop gang worker
         do iEdge=edgeStart,edgeEnd ! MGD do we really just need edges touching owned cells?
 
@@ -2463,7 +2463,7 @@ module atm_time_integration
       end if ! test for first acoustic step
 
       if (small_step == 1) then  ! initialize here on first small timestep.
-         !$acc parallel ACC_DEFAULT_ARG
+         !$acc parallel default(present)
          !$acc loop gang worker vector collapse(2)
          do iCell=cellStart,cellEnd
             do k=1,nVertLevels
@@ -2472,7 +2472,7 @@ module atm_time_integration
          end do
          !$acc end parallel
       else
-         !$acc parallel ACC_DEFAULT_ARG
+         !$acc parallel default(present)
          !$acc loop gang worker collapse(2)
          do iCell=cellStart,cellEnd
             do k=1,nVertLevels
@@ -2484,7 +2484,7 @@ module atm_time_integration
 
 !$OMP BARRIER
 
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop gang worker private(ts,rs)
       do iCell=cellSolveStart,cellSolveEnd  ! loop over all owned cells to solve
 
@@ -2668,7 +2668,7 @@ module atm_time_integration
       nVertLevels = nVertLevels_ptr
 
 
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop gang worker
       do iEdge=edgeStart,edgeEnd ! MGD do we really just need edges touching owned cells?
 
@@ -2895,7 +2895,7 @@ module atm_time_integration
 
       ! Avoid FP errors caused by a potential division by zero below by
       ! initializing the "garbage cell" of rho_zz to a non-zero value
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop gang vector
       do k=1,nVertLevels
          rho_zz(k,nCells+1) = 1.0
@@ -2907,7 +2907,7 @@ module atm_time_integration
 
       invNs = 1 / real(ns,RKIND)
 
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop gang worker
       do iCell=cellStart,cellEnd
 
@@ -2939,7 +2939,7 @@ module atm_time_integration
       !$acc end parallel
 
       if (rk_step == 3) then
-         !$acc parallel ACC_DEFAULT_ARG
+         !$acc parallel default(present)
          !$acc loop collapse(2)
          do iCell=cellStart,cellEnd
 !DIR$ IVDEP
@@ -2955,7 +2955,7 @@ module atm_time_integration
          end do
          !$acc end parallel
       else
-         !$acc parallel ACC_DEFAULT_ARG
+         !$acc parallel default(present)
          !$acc loop collapse(2)
          do iCell=cellStart,cellEnd
 !DIR$ IVDEP
@@ -2973,7 +2973,7 @@ module atm_time_integration
 
 !$OMP BARRIER
 
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop gang worker
       do iEdge=edgeStart,edgeEnd
 
@@ -2992,7 +2992,7 @@ module atm_time_integration
 
 !$OMP BARRIER
 
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop gang worker
       do iCell=cellStart,cellEnd
 
@@ -4825,7 +4825,7 @@ module atm_time_integration
 
       if (rk_step == 1) then
 
-         !$acc parallel ACC_DEFAULT_ARG
+         !$acc parallel default(present)
          !$acc loop gang worker
          do iEdge = edgeStart, edgeEnd
             !$acc loop vector
@@ -4850,7 +4850,7 @@ module atm_time_integration
 
             else if(config_horiz_mixing == "2d_fixed") then
 
-               !$acc parallel ACC_DEFAULT_ARG
+               !$acc parallel default(present)
                !$acc loop gang worker
                do iCell = cellStart, cellEnd
                   !$acc loop vector
@@ -4886,7 +4886,7 @@ module atm_time_integration
 
          if (config_mpas_cam_coef > 0.0) then
 
-            !$acc parallel ACC_DEFAULT_ARG
+            !$acc parallel default(present)
             !$acc loop gang worker
             do iCell = cellStart,cellEnd
                !
@@ -4909,7 +4909,7 @@ module atm_time_integration
       ! tendency for density.
       ! accumulate horizontal mass-flux
 
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop gang worker
       do iCell=cellStart,cellEnd
 
@@ -4933,7 +4933,7 @@ module atm_time_integration
 
       ! compute horiontal mass-flux divergence, add vertical mass flux divergence to complete tend_rho
 
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop gang worker
       do iCell = cellStart,cellEnd
          r = invAreaCell(iCell)
@@ -4953,7 +4953,7 @@ module atm_time_integration
 
         rgas_cprcv = rgas*cp/cv
 
-        !$acc parallel ACC_DEFAULT_ARG
+        !$acc parallel default(present)
         !$acc loop gang worker
         do iCell = cellStart,cellEnd
 
@@ -4974,7 +4974,7 @@ module atm_time_integration
       ! Compute u (normal) velocity tendency for each edge (cell face)
       !
 
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop gang worker private(wduz, q)
       do iEdge=edgeSolveStart,edgeSolveEnd
 
@@ -5104,7 +5104,7 @@ module atm_time_integration
 !  Rayleigh damping on u
       if (config_rayleigh_damp_u) then
 
-         !$acc parallel ACC_DEFAULT_ARG
+         !$acc parallel default(present)
          rayleigh_coef_inverse = 1.0 / ( real(config_number_rayleigh_damp_u_levels) &
                                          * (config_rayleigh_damp_u_timescale_days*seconds_per_day) )
 
@@ -5114,7 +5114,7 @@ module atm_time_integration
          end do
          !$acc end parallel
 
-         !$acc parallel ACC_DEFAULT_ARG
+         !$acc parallel default(present)
          !$acc loop gang worker
          do iEdge=edgeSolveStart,edgeSolveEnd
 !DIR$ IVDEP
@@ -5127,7 +5127,7 @@ module atm_time_integration
 
       end if
 
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop gang worker
       do iEdge=edgeSolveStart,edgeSolveEnd
 !DIR$ IVDEP
@@ -5146,7 +5146,7 @@ module atm_time_integration
       !  horizontal advection for w
       !
 
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop gang worker private(ru_edge_w, flux_arr)
       do iCell=cellSolveStart,cellSolveEnd    ! Technically updating fewer cells than before...
 
@@ -5195,7 +5195,7 @@ module atm_time_integration
       !$acc end parallel
 
 #ifdef CURVATURE
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop gang worker
       do iCell = cellSolveStart, cellSolveEnd
 !DIR$ IVDEP
@@ -5247,7 +5247,7 @@ module atm_time_integration
       !  vertical advection, pressure gradient and buoyancy for w
       !
 
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop gang worker private(wdwz)
       do iCell=cellSolveStart,cellSolveEnd
 
@@ -5289,7 +5289,7 @@ module atm_time_integration
 
       ! add in mixing terms for w
 
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop gang worker
       do iCell = cellSolveStart,cellSolveEnd
 !DIR$ IVDEP
@@ -5306,7 +5306,7 @@ module atm_time_integration
       !  horizontal advection for theta
       !
 
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop gang worker private(flux_arr)
       do iCell=cellSolveStart,cellSolveEnd    ! Technically updating fewer cells than before...
 
@@ -5349,7 +5349,7 @@ module atm_time_integration
 
       if(rk_step > 1) then
 
-        !$acc parallel ACC_DEFAULT_ARG
+        !$acc parallel default(present)
         !$acc loop gang worker
         do iCell=cellSolveStart,cellSolveEnd
 
@@ -5405,7 +5405,7 @@ module atm_time_integration
       !
 
 
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop gang worker private(wdtz)
       do iCell = cellSolveStart,cellSolveEnd
 
@@ -5436,7 +5436,7 @@ module atm_time_integration
       end do
       !$acc end parallel
 
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop gang worker
       do iCell = cellSolveStart,cellSolveEnd
 !DIR$ IVDEP
@@ -5628,7 +5628,7 @@ module atm_time_integration
       !
       ! Compute height on cell edges at velocity locations
       !
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop gang
       do iEdge=edgeStart,edgeEnd
          cell1 = cellsOnEdge(1,iEdge)
@@ -5712,7 +5712,7 @@ module atm_time_integration
       !
       ! Replace 2.0 with 2 in exponentiation to avoid outside chance that
       ! compiler will actually allow "float raised to float" operation
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop gang
       do iCell=cellStart,cellEnd
          !$acc loop vector
@@ -5745,7 +5745,7 @@ module atm_time_integration
 
          ! Replace 2.0 with 2 in exponentiation to avoid outside chance that
          ! compiler will actually allow "float raised to float" operation
-         !$acc parallel ACC_DEFAULT_ARG
+         !$acc parallel default(present)
          !$acc loop gang
          do iVertex=vertexStart,vertexEnd
             r = 0.25 * invAreaTriangle(iVertex) 
@@ -5770,7 +5770,7 @@ module atm_time_integration
 
          ke_fact = 1.0 - .375
 
-         !$acc parallel ACC_DEFAULT_ARG
+         !$acc parallel default(present)
          !$acc loop collapse(2)
          do iCell=cellStart,cellEnd
             do k=1,nVertLevels
@@ -5779,7 +5779,7 @@ module atm_time_integration
          end do
          !$acc end parallel
 
-         !$acc parallel ACC_DEFAULT_ARG
+         !$acc parallel default(present)
          !$acc loop gang
          do iCell=cellStart,cellEnd
             r = invAreaCell(iCell)
@@ -5808,7 +5808,7 @@ module atm_time_integration
       end if
 
       if (reconstruct_v) then
-        !$acc parallel ACC_DEFAULT_ARG
+        !$acc parallel default(present)
         !$acc loop gang
         do iEdge = edgeStart,edgeEnd
           !$acc loop vector
@@ -5834,7 +5834,7 @@ module atm_time_integration
       !
       ! Avoid dividing h_vertex by areaTriangle and move areaTriangle into
       ! numerator for the pv_vertex calculation
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop collapse(2)
       do iVertex = vertexStart,vertexEnd
 !DIR$ IVDEP
@@ -5857,7 +5857,7 @@ module atm_time_integration
       ! Compute pv at the edges
       !   ( this computes pv_edge at all edges bounding real cells )
       !
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop collapse(2)
       do iEdge = edgeStart,edgeEnd
 !DIR$ IVDEP
@@ -5874,7 +5874,7 @@ module atm_time_integration
          !    ( this computes pv_cell for all real cells )
          !  only needed for APVM upwinding
          !
-         !$acc parallel ACC_DEFAULT_ARG
+         !$acc parallel default(present)
          !$acc loop gang
          do iCell=cellStart,cellEnd
             !$acc loop vector
@@ -5913,7 +5913,7 @@ module atm_time_integration
          ! Also precomputed inverses of dvEdge and dcEdge to avoid repeated divisions
          !
          r = config_apvm_upwinding * dt
-         !$acc parallel ACC_DEFAULT_ARG
+         !$acc parallel default(present)
          !$acc loop gang
          do iEdge = edgeStart,edgeEnd
             r1 = 1.0_RKIND * invDvEdge(iEdge)
@@ -6036,7 +6036,7 @@ module atm_time_integration
       rcv = rgas / (cp-rgas)
       p0 = 1.e5  ! this should come from somewhere else...
 
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop gang
       do iCell=cellStart,cellEnd
          !$acc loop vector
@@ -6049,7 +6049,7 @@ module atm_time_integration
 
 !$OMP BARRIER
 
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop gang
       do iEdge=edgeStart,edgeEnd
          cell1 = cellsOnEdge(1,iEdge)
@@ -6066,7 +6066,7 @@ module atm_time_integration
       ! Compute rw (i.e. rho_zz * omega) from rho_zz, w, and ru.
       ! We are reversing the procedure we use in subroutine atm_recover_large_step_variables.
       ! first, the piece that depends on w.
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop gang
       do iCell=cellStart,cellEnd
          rw(1,iCell) = 0.0
@@ -6081,7 +6081,7 @@ module atm_time_integration
       !$acc end parallel
   
       ! next, the piece that depends on ru
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop gang
       do iCell=cellStart,cellEnd
          !$acc loop seq
@@ -6098,7 +6098,7 @@ module atm_time_integration
       end do
       !$acc end parallel
 
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop collapse(2)
       do iCell=cellStart,cellEnd
          do k=1,nVertLevels
@@ -6107,7 +6107,7 @@ module atm_time_integration
       end do
       !$acc end parallel
 
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop collapse(2)
       do iCell=cellStart,cellEnd
          do k=1,nVertLevels
@@ -6116,7 +6116,7 @@ module atm_time_integration
       end do
       !$acc end parallel
 
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop collapse(2)
       do iCell=cellStart,cellEnd
          do k=1,nVertLevels
@@ -6126,7 +6126,7 @@ module atm_time_integration
       end do
       !$acc end parallel
 
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop collapse(2)
       do iCell=cellStart,cellEnd
          do k=1,nVertLevels
@@ -6136,7 +6136,7 @@ module atm_time_integration
       end do
       !$acc end parallel
 
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop collapse(2)
       do iCell=cellStart,cellEnd
          do k=1,nVertLevels
@@ -6231,7 +6231,7 @@ module atm_time_integration
       inv_dynamics_split = 1.0_RKIND / real(dynamics_split)
 
       if (dynamics_substep < dynamics_split) then
-         !$acc parallel ACC_DEFAULT_ARG
+         !$acc parallel default(present)
          !$acc loop gang worker
          do iEdge = edgeStart,edgeEnd
             !$acc loop vector
@@ -6265,7 +6265,7 @@ module atm_time_integration
       end if
 
       if (dynamics_substep == 1) then
-         !$acc parallel ACC_DEFAULT_ARG
+         !$acc parallel default(present)
          !$acc loop gang worker
          do iEdge = edgeStart,edgeEnd
             !$acc loop vector
@@ -6282,7 +6282,7 @@ module atm_time_integration
          end do
          !$acc end parallel
       else
-         !$acc parallel ACC_DEFAULT_ARG
+         !$acc parallel default(present)
          !$acc loop gang worker
          do iEdge = edgeStart,edgeEnd
             !$acc loop vector
@@ -6301,7 +6301,7 @@ module atm_time_integration
       end if
 
       if (dynamics_substep == dynamics_split) then
-         !$acc parallel ACC_DEFAULT_ARG
+         !$acc parallel default(present)
          !$acc loop gang worker
          do iEdge = edgeStart,edgeEnd
             !$acc loop vector
@@ -6381,7 +6381,7 @@ module atm_time_integration
       integer :: iCell, k
 
 
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop gang worker
       do iCell=cellSolveStart,cellSolveEnd
          if (bdyMaskCell(iCell) > nRelaxZone) then
@@ -6435,7 +6435,7 @@ module atm_time_integration
       call mpas_pool_get_array(mesh, 'bdyMaskEdge', bdyMaskEdge)
       call mpas_pool_get_array(tend, 'rt_diabatic_tend', rt_diabatic_tend)
 
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop gang worker
       do iCell = cellSolveStart, cellSolveEnd
          if(bdyMaskCell(iCell) > nRelaxZone) then
@@ -6450,7 +6450,7 @@ module atm_time_integration
       end do
       !$acc end parallel
 
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop gang worker
       do iEdge = edgeSolveStart, edgeSolveEnd
          if(bdyMaskEdge(iEdge) > nRelaxZone) then
@@ -6549,7 +6549,7 @@ module atm_time_integration
       !$acc enter data create(divergence1, divergence2, vorticity1, vorticity2)
       
       !  First, Rayleigh damping terms for ru, rtheta_m and rho_zz
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop gang worker
       do iCell = cellSolveStart, cellSolveEnd
          if( (bdyMaskCell(iCell) > 1) .and. (bdyMaskCell(iCell) <= nRelaxZone) ) then
@@ -6575,7 +6575,7 @@ module atm_time_integration
       !$acc end parallel
 
       !  Second, the horizontal filter for rtheta_m and rho_zz
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop gang worker
       do iCell = cellSolveStart, cellSolveEnd ! threaded over cells
 
@@ -6607,7 +6607,7 @@ module atm_time_integration
       !$acc end parallel
 
       !  Third (and last), the horizontal filter for ru
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop gang worker private(divergence1, divergence2, vorticity1, vorticity2)
       do iEdge = edgeStart, edgeEnd
 
@@ -6726,7 +6726,7 @@ module atm_time_integration
       call mpas_pool_get_array(diag, 'rtheta_p', rtheta_p)
       call mpas_pool_get_array(diag, 'rtheta_base', rtheta_base)
       
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop gang worker
       do iCell = cellSolveStart, cellSolveEnd
          if( bdyMaskCell(iCell) > nRelaxZone) then
@@ -6829,7 +6829,7 @@ module atm_time_integration
       !---
       !$acc enter data create(scalars_tmp)
 
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop gang worker
       do iCell = cellSolveStart, cellSolveEnd ! threaded over cells
 
@@ -6894,7 +6894,7 @@ module atm_time_integration
 
 !$OMP BARRIER
 
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop gang worker
       do iCell = cellSolveStart, cellSolveEnd ! threaded over cells
          if (bdyMaskCell(iCell) > 1) then ! update values
@@ -6979,7 +6979,7 @@ module atm_time_integration
 
       !---
 
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop gang worker
       do iCell = cellSolveStart, cellSolveEnd ! threaded over cells
 
@@ -7088,7 +7088,7 @@ module atm_time_integration
          kMax = -1
          latMax = 0.0
          lonMax = 0.0
-         !$acc parallel ACC_DEFAULT_ARG
+         !$acc parallel default(present)
          !$acc loop collapse(2) gang vector reduction(min:scalar_min)
          do iCell = 1, nCellsSolve
          do k = 1, nVertLevels
@@ -7099,7 +7099,7 @@ module atm_time_integration
 
          ! This second loop using offset_1d ensures the same (kMax,indexMax) are reported with the scalar_min
          ! Especially when using OpenACC
-         !$acc parallel ACC_DEFAULT_ARG
+         !$acc parallel default(present)
          !$acc loop collapse(2) gang vector reduction(min:offset_1d)
          do iCell = 1, nCellsSolve
          do k = 1, nVertLevels
@@ -7140,7 +7140,7 @@ module atm_time_integration
          kMax = -1
          latMax = 0.0
          lonMax = 0.0
-         !$acc parallel ACC_DEFAULT_ARG
+         !$acc parallel default(present)
          !$acc loop collapse(2) gang vector reduction(max:scalar_max)
          do iCell = 1, nCellsSolve
          do k = 1, nVertLevels
@@ -7149,7 +7149,7 @@ module atm_time_integration
          end do
          !$acc end parallel
 
-         !$acc parallel ACC_DEFAULT_ARG
+         !$acc parallel default(present)
          !$acc loop collapse(2) gang vector reduction(min:offset_1d)
          do iCell = 1, nCellsSolve
          do k = 1, nVertLevels
@@ -7189,7 +7189,7 @@ module atm_time_integration
          kMax = -1
          latMax = 0.0
          lonMax = 0.0
-         !$acc parallel ACC_DEFAULT_ARG
+         !$acc parallel default(present)
          !$acc loop collapse(2) gang vector reduction(min:scalar_min)
          do iEdge = 1, nEdgesSolve
          do k = 1, nVertLevels
@@ -7198,7 +7198,7 @@ module atm_time_integration
          end do
          !$acc end parallel
 
-         !$acc parallel ACC_DEFAULT_ARG
+         !$acc parallel default(present)
          !$acc loop collapse(2) gang vector reduction(min:offset_1d)
          do iEdge = 1, nEdgesSolve
          do k = 1, nVertLevels
@@ -7238,7 +7238,7 @@ module atm_time_integration
          kMax = -1
          latMax = 0.0
          lonMax = 0.0
-         !$acc parallel ACC_DEFAULT_ARG
+         !$acc parallel default(present)
          !$acc loop collapse(2) gang vector reduction(max:scalar_max)
          do iEdge = 1, nEdgesSolve
          do k = 1, nVertLevels
@@ -7247,7 +7247,7 @@ module atm_time_integration
          end do
          !$acc end parallel
 
-         !$acc parallel ACC_DEFAULT_ARG
+         !$acc parallel default(present)
          !$acc loop collapse(2) gang vector reduction(min:offset_1d)
          do iEdge = 1, nEdgesSolve
          do k = 1, nVertLevels
@@ -7287,7 +7287,7 @@ module atm_time_integration
          kMax = -1
          latMax = 0.0
          lonMax = 0.0
-         !$acc parallel ACC_DEFAULT_ARG
+         !$acc parallel default(present)
          !$acc loop collapse(2) gang vector reduction(max:scalar_max)
          do iEdge = 1, nEdgesSolve
          do k = 1, nVertLevels
@@ -7297,7 +7297,7 @@ module atm_time_integration
          end do
          !$acc end parallel
 
-         !$acc parallel ACC_DEFAULT_ARG
+         !$acc parallel default(present)
          !$acc loop collapse(2) gang vector reduction(min:offset_1d)
          do iEdge = 1, nEdgesSolve
          do k = 1, nVertLevels
@@ -7336,7 +7336,7 @@ module atm_time_integration
          !
          found_NaN = .false.
 
-         !$acc parallel ACC_DEFAULT_ARG
+         !$acc parallel default(present)
          !$acc loop collapse(2) gang vector reduction(.or.:found_NaN)
          do iCell = 1, nCellsSolve
          do k = 1, nVertLevels
@@ -7352,7 +7352,7 @@ module atm_time_integration
 
          found_NaN = .false.
 
-         !$acc parallel ACC_DEFAULT_ARG
+         !$acc parallel default(present)
          !$acc loop collapse(2) gang vector reduction(.or.:found_NaN)
          do iEdge = 1, nEdgesSolve
          do k = 1, nVertLevels
@@ -7373,7 +7373,7 @@ module atm_time_integration
 
          scalar_min = 0.0
          scalar_max = 0.0
-         !$acc parallel ACC_DEFAULT_ARG
+         !$acc parallel default(present)
          !$acc loop gang vector collapse(2) reduction(min:scalar_min) reduction(max:scalar_max)
          do iCell = 1, nCellsSolve
          do k = 1, nVertLevels
@@ -7388,7 +7388,7 @@ module atm_time_integration
 
          scalar_min = 0.0
          scalar_max = 0.0
-         !$acc parallel ACC_DEFAULT_ARG
+         !$acc parallel default(present)
          !$acc loop gang vector collapse(2) reduction(min:scalar_min) reduction(max:scalar_max)
          do iEdge = 1, nEdgesSolve
          do k = 1, nVertLevels
@@ -7410,7 +7410,7 @@ module atm_time_integration
          do iScalar = 1, num_scalars
             scalar_min = 0.0
             scalar_max = 0.0
-            !$acc parallel ACC_DEFAULT_ARG
+            !$acc parallel default(present)
             !$acc loop gang vector collapse(2) reduction(min:scalar_min) reduction(max:scalar_max)
             do iCell = 1, nCellsSolve
             do k = 1, nVertLevels

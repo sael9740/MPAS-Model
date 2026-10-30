@@ -505,7 +505,7 @@ module atm_core
 
       allocate(ke_vertex(nVertLevels,nVertices+1))  ! ke_vertex is a module variable defined in mpas_atm_time_integration.F
       allocate(ke_edge(nVertLevels,nEdges+1))       ! ke_edge is a module variable defined in mpas_atm_time_integration.F
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop vector
       do k = 1, nVertLevels
          ke_vertex(k,nVertices+1) = 0.0_RKIND
@@ -990,7 +990,7 @@ module atm_core
       ! permanently resident dynamics set, so running this on the host would read
       ! whatever the host happened to hold and would leave the device copies of
       ! theta, rho and pressure stale for the rest of the run.
-      !$acc parallel ACC_DEFAULT_ARG
+      !$acc parallel default(present)
       !$acc loop gang worker
       do iCell=1,nCells_acc
          !$acc loop vector

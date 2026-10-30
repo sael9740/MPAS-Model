@@ -193,7 +193,7 @@
 !and longwave and shortwave radiation:
  allocate(tend_th(nVertLevels,nCellsSolve))
 
- !$acc kernels ACC_DEFAULT_ARG
+ !$acc kernels default(present)
  tend_th(:,:)             = 0._RKIND
  tend_scalars(:,:,:)      = 0._RKIND
  tend_ru_physics(:,:)     = 0._RKIND
@@ -467,7 +467,7 @@
 !convert the tendency for the potential temperature to tendency for the modified potential temperature:
 !This runs unconditionally (not gated by any physics scheme), against scalars/tend_theta/tend_th,
 !all of which are device-resident, so it runs on the device rather than via a host round-trip.
- !$acc parallel loop gang vector collapse(2) ACC_DEFAULT_ARG
+ !$acc parallel loop gang vector collapse(2) default(present)
  do i = 1, nCellsSolve
  do k = 1, nVertLevels
     coeff = (1. + R_v/R_d * scalars(index_qv,k,i))
